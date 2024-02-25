@@ -1,0 +1,20 @@
+# def handle_packet(packet):
+#
+#     print("======================================================================================")
+#     # If it has ether layer
+#     if Ether in packet:
+#         #  Saves src and destination mac adress
+#         src_mac = packet[Ether].src
+#         dst_mac = packet[Ether].dst
+#         # Prints src and dst MAC adress
+#         print(f"Zdrojová MAC adresa: {src_mac}, Cieľová MAC adresa: {dst_mac}")
+#     else: # If it has no ether layer
+#
+#         print("Packet has no ether layer")
+#
+#     # Prints more details about packet
+#     #packet.show()
+#
+#
+# #sniff(filter="dst host 10.6.0.7", prn=handle_packet)
+# sniff(filter="dst host  147.175.162.231", prn=handle_packet)
