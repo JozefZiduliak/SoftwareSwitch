@@ -10,146 +10,127 @@ class Switch:
     def __init__(self):
 
         self.interfaces = {
-            "eth0": "Realtek USB GbE Family Controller #2",
-            "eth1": "Realtek USB GbE Family Controller"
+            "eth0": "Realtek USB GbE Family Controller",
+            "eth1": "Realtek USB GbE Family Controller #2"
+        }
+
+        self.interfaces_stats = {
+            "interface1": {
+                "Incoming": {
+                    "Ethernet_IN": 0,
+                    "IP_IN": 0,
+                    "ARP_IN": 0,
+                    "TCP_IN": 0,
+                    "UDP_IN": 0,
+                    "ICMP_IN": 0,
+                    "HTTP_IN": 0,
+                    "HTTPS_IN": 0,
+                    "Total_IN": 0,
+                },
+                "Outgoing": {
+                    "Ethernet_OUT": 0,
+                    "IP_OUT": 0,
+                    "ARP_OUT": 0,
+                    "TCP_OUT": 0,
+                    "UDP_OUT": 0,
+                    "ICMP_OUT": 0,
+                    "HTTP_OUT": 0,
+                    "HTTPS_OUT": 0,
+                    "Total_OUT": 0,
+                }
+            },
+            "interface2": {
+                "Incoming": {
+                    "Ethernet_IN": 0,
+                    "IP_IN": 0,
+                    "ARP_IN": 0,
+                    "TCP_IN": 0,
+                    "UDP_IN": 0,
+                    "ICMP_IN": 0,
+                    "HTTP_IN": 0,
+                    "HTTPS_IN": 0,
+                    "Total_IN": 0,
+                },
+                "Outgoing": {
+                    "Ethernet_OUT": 0,
+                    "IP_OUT": 0,
+                    "ARP_OUT": 0,
+                    "TCP_OUT": 0,
+                    "UDP_OUT": 0,
+                    "ICMP_OUT": 0,
+                    "HTTP_OUT": 0,
+                    "HTTPS_OUT": 0,
+                    "Total_OUT": 0,
+                }
+            }
         }
 
         self.switch_table = {
 
         }
 
-        self.interface_0_stats = InterfaceStats()
-        self.interface_1_stats = InterfaceStats()
+        self.stop_threads = False
 
-        self.test_number = 0
+        self.packet_number = 0
+    def handle_packet(self, packet, interface_name, target_interface):
 
-    def handle_packet(self, packet, interface_name, target_interface):  # Pridaj 'self' ako prvý argument
-        print("======================================================================================")
-
-        print(f"Interface name is {interface_name}")
+        # Zisti správny kľúč pre aktuálne rozhranie
+        current_interface_key = "interface1" if interface_name == "eth0" else "interface2"
 
         if Ether in packet:
-            src_mac = packet[Ether].src
-            dst_mac = packet[Ether].dst
-            print(f"Zdrojová MAC adresa: {src_mac}, Cieľová MAC adresa: {dst_mac}")
+            src_mac = packet['Ether'].src
+            dst_mac = packet['Ether'].dst
 
-            if interface_name == "eth0":
-                self.interface_0_stats.Ethernet_IN += 1
-                self.interface_0_stats.Total_IN += 1
-                self.interface_1_stats.Ethernet_OUT += 1
-                self.interface_1_stats.Total_OUT += 1
-                self.forward_packet(packet, target_interface)
-            else:
-                self.interface_1_stats.Ethernet_IN += 1
-                self.interface_1_stats.Total_IN += 1
-                self.interface_0_stats.Ethernet_OUT += 1
-                self.interface_0_stats.Total_OUT += 1
-                self.forward_packet(packet, target_interface)
-
+            #update_stats("Incoming", "Ethernet_IN")
+            self.interfaces_stats[current_interface_key]["Incoming"]["Ethernet_IN"] += 1
             self.add_entry(src_mac, 0, interface_name)
 
         if IP in packet:
-
-            if interface_name == "eth0":
-                self.interface_0_stats.IP_IN += 1
-                self.interface_0_stats.Total_IN += 1
-                self.interface_1_stats.IP_OUT += 1
-                self.interface_1_stats.Total_OUT += 1
-
-            else:
-                self.interface_1_stats.IP_IN += 1
-                self.interface_1_stats.Total_IN += 1
-                self.interface_0_stats.IP_OUT += 1
-                self.interface_0_stats.Total_OUT += 1
+            self.interfaces_stats[current_interface_key]["Incoming"]["IP_IN"] += 1
 
         if ARP in packet:
-                if interface_name == "eth0":
-                    self.interface_0_stats.ARP_IN += 1
-                    self.interface_0_stats.Total_IN += 1
-                    self.interface_1_stats.ARP_OUT += 1
-                    self.interface_1_stats.Total_OUT += 1
-
-                else:
-                    self.interface_1_stats.ARP_IN += 1
-                    self.interface_1_stats.Total_IN += 1
-                    self.interface_0_stats.ARP_OUT += 1
-                    self.interface_0_stats.Total_OUT += 1
+            self.interfaces_stats[current_interface_key]["Incoming"]["ARP_IN"] += 1
 
         if TCP in packet:
-                if interface_name == "eth0":
-                    self.interface_0_stats.TCP_IN += 1
-                    self.interface_0_stats.Total_IN += 1
-                    self.interface_1_stats.TCP_OUT += 1
-                    self.interface_1_stats.Total_OUT += 1
-
-                else:
-                    self.interface_1_stats.TCP_IN += 1
-                    self.interface_1_stats.Total_IN += 1
-                    self.interface_0_stats.TCP_OUT += 1
-                    self.interface_0_stats.Total_OUT += 1
+            self.interfaces_stats[current_interface_key]["Incoming"]["TCP_IN"] += 1
 
         if UDP in packet:
-                if interface_name == "eth0":
-                    self.interface_0_stats.UDP_IN += 1
-                    self.interface_0_stats.Total_IN += 1
-                    self.interface_1_stats.UDP_OUT += 1
-                    self.interface_1_stats.Total_OUT += 1
-
-                else:
-                    self.interface_1_stats.UDP_IN += 1
-                    self.interface_1_stats.Total_IN += 1
-                    self.interface_0_stats.UDP_OUT += 1
-                    self.interface_0_stats.Total_OUT += 1
+            self.interfaces_stats[current_interface_key]["Incoming"]["UDP_IN"] += 1
 
         if ICMP in packet:
-                if interface_name == "eth0":
-                    self.interface_0_stats.ICMP_IN += 1
-                    self.interface_0_stats.Total_IN += 1
-                    self.interface_1_stats.ICMP_OUT += 1
-                    self.interface_1_stats.Total_OUT += 1
-
-                else:
-                    self.interface_1_stats.ICMP_IN += 1
-                    self.interface_1_stats.Total_IN += 1
-                    self.interface_0_stats.ICMP_OUT += 1
-                    self.interface_0_stats.Total_OUT += 1
+            self.interfaces_stats[current_interface_key]["Incoming"]["ICMP_IN"] += 1
 
         if HTTP in packet:
-                if interface_name == "eth0":
-                    self.interface_0_stats.HTTP_IN += 1
-                    self.interface_0_stats.Total_IN += 1
-                    self.interface_1_stats.HTTP_OUT += 1
-                    self.interface_1_stats.Total_OUT += 1
-
-                else:
-                    self.interface_1_stats.HTTP_IN += 1
-                    self.interface_1_stats.Total_IN += 1
-                    self.interface_0_stats.HTTP_OUT += 1
-                    self.interface_0_stats.Total_OUT += 1
+            self.interfaces_stats[current_interface_key]["Incoming"]["HTTP_IN"] += 1
 
         if HTTPResponse in packet:
-                if interface_name == "eth0":
-                    self.interface_0_stats.HTTPS_IN += 1
-                    self.interface_0_stats.Total_IN += 1
-                    self.interface_1_stats.HTTPS_OUT += 1
-                    self.interface_1_stats.Total_OUT += 1
+            self.interfaces_stats[current_interface_key]["Incoming"]["HTTPS_IN"] += 1
 
-                else:
-                    self.interface_1_stats.HTTPS_IN += 1
-                    self.interface_1_stats.Total_IN += 1
-                    self.interface_0_stats.HTTPS_OUT += 1
-                    self.interface_0_stats.Total_OUT += 1
+        self.interfaces_stats[current_interface_key]["Incoming"]["Total_IN"] += 1
 
-        self.show_stats()
-        print(self.switch_table)
+        self.forward_packet(packet, target_interface)
+
+        # Print total incoming traffic for both interfaces
+
+        self.packet_number += 1
+
+        print(f"Packet number: {self.packet_number}")
+
+        #print(f"Total incoming traffic: {self.interfaces_stats['interface1']['Incoming']['Total_IN'] + self.interfaces_stats['interface2']['Incoming']['Total_IN']}")
 
 
+    # def start_listening(self, interface_name, target_interface):
+    #
+    #     sniff(iface=self.interfaces[interface_name], prn=lambda packet: self.handle_packet(packet, interface_name, target_interface))
 
     def start_listening(self, interface_name, target_interface):
+        # Úprava: Kontrola `stop_threads` pred a počas príjmu paketov
+        def custom_packet_handler(packet):
+            if self.stop_threads:  # Ak je vlajka nastavená, prestane počúvať
+                return False  # Vráti False pre zastavenie sniffing
+            self.handle_packet(packet, interface_name, target_interface)
 
-        sniff(iface=self.interfaces[interface_name], prn=lambda packet: self.handle_packet(packet, interface_name, target_interface))
-
-
+        sniff(iface=self.interfaces[interface_name], prn=custom_packet_handler, stop_filter=lambda x: self.stop_threads)
 
     def  add_entry(self, mac_address, timer, interface):
         self.switch_table[mac_address] = {
@@ -157,84 +138,66 @@ class Switch:
             "interface": interface
         }
 
-    def show_stats(self):
+    def show_interface_stats(self):
+        # Header for the stats display
+        print("Interface Traffic Statistics:\n")
 
-        #Show stat for interface 0
-        print("ETH 0")
-        print(f"Ethernet IN: {self.interface_0_stats.Ethernet_IN}")
-        print(f"IP IN: {self.interface_0_stats.IP_IN}")
-        print(f"ARP IN: {self.interface_0_stats.ARP_IN}")
-        print(f"TCP IN: {self.interface_0_stats.TCP_IN}")
-        print(f"UDP IN: {self.interface_0_stats.UDP_IN}")
-        print(f"ICMP IN: {self.interface_0_stats.ICMP_IN}")
-        print(f"HTTP IN: {self.interface_0_stats.HTTP_IN}")
-        print(f"HTTPS IN: {self.interface_0_stats.HTTPS_IN}")
-        print(f"Total IN: {self.interface_0_stats.Total_IN}")
+        # Iterating through each interface in the dictionary
+        for interface, traffic_types in self.interfaces_stats.items():
+            print(f"--- {interface.upper()} ---")  # Display the interface name
 
+            # Iterating through incoming and outgoing traffic stats
+            for direction, stats in traffic_types.items():
+                print(f"\n  {direction.capitalize()} Traffic:")
+                # Iterating through each traffic type and printing its count
+                for traffic_type, count in stats.items():
+                    # Printing each traffic type's count in a readable format
+                    print(f"    {traffic_type}: {count}")
+                print("")  # Adding a newline for better readability between sections
 
-        print(f"Ethernet OUT: {self.interface_0_stats.Ethernet_OUT}")
-        print(f"IP OUT: {self.interface_0_stats.IP_OUT}")
-        print(f"ARP OUT: {self.interface_0_stats.ARP_OUT}")
-        print(f"TCP OUT: {self.interface_0_stats.TCP_OUT}")
-        print(f"UDP OUT: {self.interface_0_stats.UDP_OUT}")
-        print(f"ICMP OUT: {self.interface_0_stats.ICMP_OUT}")
-        print(f"HTTP OUT: {self.interface_0_stats.HTTP_OUT}")
-        print(f"HTTPS OUT: {self.interface_0_stats.HTTPS_OUT}")
-        print(f"Total OUT: {self.interface_0_stats.Total_OUT}")
+            # Separating interfaces for clarity
+            print("======================================\n")
 
-
-        #Show stat for interface 1
-        print("ETH 1")
-        print(f"Ethernet IN: {self.interface_1_stats.Ethernet_IN}")
-        print(f"IP IN: {self.interface_1_stats.IP_IN}")
-        print(f"ARP IN: {self.interface_1_stats.ARP_IN}")
-        print(f"TCP IN: {self.interface_1_stats.TCP_IN}")
-        print(f"UDP IN: {self.interface_1_stats.UDP_IN}")
-        print(f"ICMP IN: {self.interface_1_stats.ICMP_IN}")
-        print(f"HTTP IN: {self.interface_1_stats.HTTP_IN}")
-        print(f"HTTPS IN: {self.interface_1_stats.HTTPS_IN}")
-        print(f"Total IN: {self.interface_1_stats.Total_IN}")
-
-        print(f"Ethernet OUT: {self.interface_1_stats.Ethernet_OUT}")
-        print(f"IP OUT: {self.interface_1_stats.IP_OUT}")
-        print(f"ARP OUT: {self.interface_1_stats.ARP_OUT}")
-        print(f"TCP OUT: {self.interface_1_stats.TCP_OUT}")
-        print(f"UDP OUT: {self.interface_1_stats.UDP_OUT}")
-        print(f"ICMP OUT: {self.interface_1_stats.ICMP_OUT}")
-        print(f"HTTP OUT: {self.interface_1_stats.HTTP_OUT}")
-        print(f"HTTPS OUT: {self.interface_1_stats.HTTPS_OUT}")
-        print(f"Total OUT: {self.interface_1_stats.Total_OUT}")
 
     def forward_packet(self, packet, destination_interface):
+
         if destination_interface in self.interfaces:
             # Send the packet out of the specified interface
+
+            # Zisti správny kľúč pre aktuálne rozhranie
+            current_interface_key = "interface1" if destination_interface == "eth0" else "interface2"
+
+            if Ether in packet:
+
+                # update_stats("Incoming", "Ethernet_IN")
+                self.interfaces_stats[current_interface_key]["Outgoing"]["Ethernet_OUT"] += 1
+
+            if IP in packet:
+                self.interfaces_stats[current_interface_key]["Outgoing"]["IP_OUT"] += 1
+
+            if ARP in packet:
+                self.interfaces_stats[current_interface_key]["Outgoing"]["ARP_OUT"] += 1
+
+            if TCP in packet:
+                self.interfaces_stats[current_interface_key]["Outgoing"]["TCP_OUT"] += 1
+
+            if UDP in packet:
+                self.interfaces_stats[current_interface_key]["Outgoing"]["UDP_OUT"] += 1
+
+            if ICMP in packet:
+                self.interfaces_stats[current_interface_key]["Outgoing"]["ICMP_OUT"] += 1
+
+            if HTTP in packet:
+                self.interfaces_stats[current_interface_key]["Outgoing"]["HTTP_OUT"] += 1
+
+            if HTTPResponse in packet:
+                self.interfaces_stats[current_interface_key]["Outgoing"]["HTTPS_OUT"] += 1
+
+            self.interfaces_stats[current_interface_key]["Outgoing"]["Total_OUT"] += 1
+
             sendp(packet, iface=self.interfaces[destination_interface], verbose=False)
         else:
             print(f"Cieľové rozhranie {destination_interface} nie je definované.")
 
 
 
-
-class InterfaceStats:
-    def __init__(self):
-        # Incoming traffic
-        self.Ethernet_IN = 0
-        self.IP_IN = 0
-        self.ARP_IN = 0
-        self.TCP_IN = 0
-        self.UDP_IN = 0
-        self.ICMP_IN = 0
-        self.HTTP_IN = 0
-        self.HTTPS_IN = 0
-        self.Total_IN = 0
-
-        # Outgoing traffic
-        self.Ethernet_OUT = 0
-        self.IP_OUT = 0
-        self.ARP_OUT = 0
-        self.TCP_OUT = 0
-        self.UDP_OUT = 0
-        self.ICMP_OUT = 0
-        self.HTTP_OUT = 0
-        self.HTTPS_OUT = 0
-        self.Total_OUT = 0

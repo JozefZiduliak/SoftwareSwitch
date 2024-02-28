@@ -6,13 +6,6 @@ from SwitchLogic import Switch
 from scapy.layers.l2 import Ether
 import threading
 
-
-# app = GUIApplication()
-# app.add_mac_entry("00:00:00:00:00:02", "00:00:10", "2")
-# app.window.mainloop()
-
-#show_interfaces()
-
 def handle_packet(packet):
 
     print("======================================================================================")
@@ -33,28 +26,31 @@ def handle_packet(packet):
 
 #sniff(filter="dst host 10.6.0.7", prn=handle_packet)
 
-
-
 def main():
     # interface_name_1 = "Realtek USB GbE Family Controller"
     # sniff(iface=interface_name_1, prn=handle_packet)
 
-    # switch = Switch()
-    #
-    # thread1 = threading.Thread(target=switch.start_listening, args=("eth0", "eth1"))
-    # thread2 = threading.Thread(target=switch.start_listening, args=("eth1", "eth0"))
-    #
-    # thread1.start()
-    # thread2.start()
+    switch = Switch()
 
+    thread1 = threading.Thread(target=switch.start_listening, args=("eth0", "eth1"))
+    thread2 = threading.Thread(target=switch.start_listening, args=("eth1", "eth0"))
 
+    thread1.start()
+    thread2.start()
+
+    # while True:
+    #     total_in = switch.interfaces_stats["interface1"]["Incoming"]["Total_IN"] + \
+    #                switch.interfaces_stats["interface2"]["Incoming"]["Total_IN"]
+    #     if total_in > 100:
+    #         switch.stop_threads = True  # Nastaví vlajku na zastavenie vlákien
+    #         break  # Vychádza z hlavnej slučky
+
+    # switch.show_interface_stats()
     # print(switch.switch_table)
-    # switch.show_stats()
 
     app = GUIApplication()
     app.add_mac_entry("00:00:00:00:00:02", "00:00:10", "2")
     app.window.mainloop()
-
 
 if __name__ == "__main__":
     main()
