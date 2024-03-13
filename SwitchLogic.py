@@ -18,56 +18,68 @@ class Switch:
 
         #self.switch_gui = switch_gui
 
+        #self.interfaces_stats = {
+        #     "interface1": {
+        #         "Incoming": {
+        #             "Ethernet_IN": 0,
+        #             "IP_IN": 0,
+        #             "ARP_IN": 0,
+        #             "TCP_IN": 0,
+        #             "UDP_IN": 0,
+        #             "ICMP_IN": 0,
+        #             "HTTP_IN": 0,
+        #             "HTTPS_IN": 0,
+        #             "Total_IN": 0,
+        #         },
+        #         "Outgoing": {
+        #             "Ethernet_OUT": 0,
+        #             "IP_OUT": 0,
+        #             "ARP_OUT": 0,
+        #             "TCP_OUT": 0,
+        #             "UDP_OUT": 0,
+        #             "ICMP_OUT": 0,
+        #             "HTTP_OUT": 0,
+        #             "HTTPS_OUT": 0,
+        #             "Total_OUT": 0,
+        #         }
+        #     },
+        #     "interface2": {
+        #         "Incoming": {
+        #             "Ethernet_IN": 0,
+        #             "IP_IN": 0,
+        #             "ARP_IN": 0,
+        #             "TCP_IN": 0,
+        #             "UDP_IN": 0,
+        #             "ICMP_IN": 0,
+        #             "HTTP_IN": 0,
+        #             "HTTPS_IN": 0,
+        #             "Total_IN": 0,
+        #         },
+        #         "Outgoing": {
+        #             "Ethernet_OUT": 0,
+        #             "IP_OUT": 0,
+        #             "ARP_OUT": 0,
+        #             "TCP_OUT": 0,
+        #             "UDP_OUT": 0,
+        #             "ICMP_OUT": 0,
+        #             "HTTP_OUT": 0,
+        #             "HTTPS_OUT": 0,
+        #             "Total_OUT": 0,
+        #         }
+        #     }
+        # }
+
+
         self.interfaces_stats = {
             "interface1": {
-                "Incoming": {
-                    "Ethernet_IN": 0,
-                    "IP_IN": 0,
-                    "ARP_IN": 0,
-                    "TCP_IN": 0,
-                    "UDP_IN": 0,
-                    "ICMP_IN": 0,
-                    "HTTP_IN": 0,
-                    "HTTPS_IN": 0,
-                    "Total_IN": 0,
-                },
-                "Outgoing": {
-                    "Ethernet_OUT": 0,
-                    "IP_OUT": 0,
-                    "ARP_OUT": 0,
-                    "TCP_OUT": 0,
-                    "UDP_OUT": 0,
-                    "ICMP_OUT": 0,
-                    "HTTP_OUT": 0,
-                    "HTTPS_OUT": 0,
-                    "Total_OUT": 0,
-                }
+                "Incoming": self.generate_stats_dict(),
+                "Outgoing": self.generate_stats_dict()
             },
             "interface2": {
-                "Incoming": {
-                    "Ethernet_IN": 0,
-                    "IP_IN": 0,
-                    "ARP_IN": 0,
-                    "TCP_IN": 0,
-                    "UDP_IN": 0,
-                    "ICMP_IN": 0,
-                    "HTTP_IN": 0,
-                    "HTTPS_IN": 0,
-                    "Total_IN": 0,
-                },
-                "Outgoing": {
-                    "Ethernet_OUT": 0,
-                    "IP_OUT": 0,
-                    "ARP_OUT": 0,
-                    "TCP_OUT": 0,
-                    "UDP_OUT": 0,
-                    "ICMP_OUT": 0,
-                    "HTTP_OUT": 0,
-                    "HTTPS_OUT": 0,
-                    "Total_OUT": 0,
+                "Incoming": self.generate_stats_dict(),
+                "Outgoing": self.generate_stats_dict()
                 }
             }
-        }
 
         # self.switch_table = {
         #
@@ -115,32 +127,30 @@ class Switch:
 
         if not is_looping:
 
-            self.interfaces_stats[current_interface_key]["Incoming"]["Ethernet_IN"] += 1
+            protocol_map = {
+                Ether: "Ethernet",
+                IP: "IP",
+                ARP: "ARP",
+                TCP: "TCP",
+                UDP: "UDP",
+                ICMP: "ICMP"
+            }
 
-            if IP in packet:
-                self.interfaces_stats[current_interface_key]["Incoming"]["IP_IN"] += 1
+            # Iterate over the protocol_map
+            for protocol, key in protocol_map.items():
+                # If the packet is of the current protocol type, increment the corresponding count
+                if protocol in packet:
+                    self.interfaces_stats[current_interface_key]["Incoming"][key] += 1
 
-            if ARP in packet:
-                self.interfaces_stats[current_interface_key]["Incoming"]["ARP_IN"] += 1
-
+            # Check for HTTP and HTTPS separately as they are identified by destination port
             if TCP in packet:
-                self.interfaces_stats[current_interface_key]["Incoming"]["TCP_IN"] += 1
+                if packet[TCP].dport == 80:
+                    self.interfaces_stats[current_interface_key]["Incoming"]["HTTP"] += 1
+                elif packet[TCP].dport == 443:
+                    self.interfaces_stats[current_interface_key]["Incoming"]["HTTPS"] += 1
 
-            if UDP in packet:
-                self.interfaces_stats[current_interface_key]["Incoming"]["UDP_IN"] += 1
-
-            if ICMP in packet:
-                self.interfaces_stats[current_interface_key]["Incoming"]["ICMP_IN"] += 1
-
-            if HTTP in packet:
-                self.interfaces_stats[current_interface_key]["Incoming"]["HTTP_IN"] += 1
-
-            if HTTPResponse in packet:
-                self.interfaces_stats[current_interface_key]["Incoming"]["HTTPS_IN"] += 1
-
-            self.interfaces_stats[current_interface_key]["Incoming"]["Total_IN"] += 1
-
-            stats_values = self.get_traffic_stats(current_interface_key, "Incoming")
+            # Increment the total incoming traffic count
+            self.interfaces_stats[current_interface_key]["Incoming"]["Total"] += 1
 
             #self.switch_gui.update_traffic(current_interface_key, "Incoming", stats_values)
 
@@ -207,31 +217,31 @@ class Switch:
             # Zisti správny kľúč pre aktuálne rozhranie
             current_interface_key = "interface1" if destination_interface == "eth0" else "interface2"
 
-            if Ether in packet:
-                self.interfaces_stats[current_interface_key]["Outgoing"]["Ethernet_OUT"] += 1
+            # Define a dictionary to map protocol types to their keys in interfaces_stats
+            protocol_map = {
+                Ether: "Ethernet",
+                IP: "IP",
+                ARP: "ARP",
+                TCP: "TCP",
+                UDP: "UDP",
+                ICMP: "ICMP"
+            }
 
-            if IP in packet:
-                self.interfaces_stats[current_interface_key]["Outgoing"]["IP_OUT"] += 1
+            # Iterate over the protocol_map
+            for protocol, key in protocol_map.items():
+                # If the packet is of the current protocol type, increment the corresponding count
+                if protocol in packet:
+                    self.interfaces_stats[current_interface_key]["Outgoing"][key] += 1
 
-            if ARP in packet:
-                self.interfaces_stats[current_interface_key]["Outgoing"]["ARP_OUT"] += 1
-
+            # Check for HTTP and HTTPS separately as they are identified by destination port
             if TCP in packet:
-                self.interfaces_stats[current_interface_key]["Outgoing"]["TCP_OUT"] += 1
+                if packet[TCP].dport == 80:
+                    self.interfaces_stats[current_interface_key]["Outgoing"]["HTTP"] += 1
+                elif packet[TCP].dport == 443:
+                    self.interfaces_stats[current_interface_key]["Outgoing"]["HTTPS"] += 1
 
-            if UDP in packet:
-                self.interfaces_stats[current_interface_key]["Outgoing"]["UDP_OUT"] += 1
-
-            if ICMP in packet:
-                self.interfaces_stats[current_interface_key]["Outgoing"]["ICMP_OUT"] += 1
-
-            if HTTP in packet:
-                self.interfaces_stats[current_interface_key]["Outgoing"]["HTTP_OUT"] += 1
-
-            if HTTPResponse in packet:
-                self.interfaces_stats[current_interface_key]["Outgoing"]["HTTPS_OUT"] += 1
-
-            self.interfaces_stats[current_interface_key]["Outgoing"]["Total_OUT"] += 1
+            # Increment the total outgoing traffic count
+            self.interfaces_stats[current_interface_key]["Outgoing"]["Total"] += 1
 
             sendp(packet, iface=self.interfaces[destination_interface], verbose=False)
         else:
@@ -249,6 +259,18 @@ class Switch:
             print("Invalid interface name or direction.")
             return []
 
+    def generate_stats_dict(self):
+        return {
+            "Ethernet": 0,
+            "IP": 0,
+            "ARP": 0,
+            "TCP": 0,
+            "UDP": 0,
+            "ICMP": 0,
+            "HTTP": 0,
+            "HTTPS": 0,
+            "Total": 0,
+        }
 
 # Class for mac address table
 
