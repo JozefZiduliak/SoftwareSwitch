@@ -1,56 +1,30 @@
-from scapy.all import *
-#import SwitchGUI
-from SwitchGUI import GUIApplication
+import threading
+from Switch_GUI import SwitchGUI
 from SwitchLogic import Switch
 
-from scapy.layers.l2 import Ether
-import threading
-
-def handle_packet(packet):
-
-    print("======================================================================================")
-    # If it has ether layer
-    if Ether in packet:
-        #  Saves src and destination mac adress
-        src_mac = packet[Ether].src
-        dst_mac = packet[Ether].dst
-        # Prints src and dst MAC adress
-        print(f"Zdrojová MAC adresa: {src_mac}, Cieľová MAC adresa: {dst_mac}")
-    else: # If it has no ether layer
-
-        print("Packet has no ether layer")
-
-    # Prints more details about packet
-    #packet.show()
-
-
-#sniff(filter="dst host 10.6.0.7", prn=handle_packet)
 
 def main():
-    # interface_name_1 = "Realtek USB GbE Family Controller"
-    # sniff(iface=interface_name_1, prn=handle_packet)
 
+    # switch = Switch()
+    # gui = SwitchGUI(switch)
+    #
+    # gui.run()
+
+    #gui = SwitchGUI()
     switch = Switch()
 
-    thread1 = threading.Thread(target=switch.start_listening, args=("eth0", "eth1"))
-    thread2 = threading.Thread(target=switch.start_listening, args=("eth1", "eth0"))
+    # Start the threads that sniff, handle and forward the packets
+    sniffing_thread1 = threading.Thread(target=switch.start_listening, args=("eth0", "eth1"))
+    sniffing_thread2 = threading.Thread(target=switch.start_listening, args=("eth1", "eth0"))
 
-    thread1.start()
-    thread2.start()
+    sniffing_thread1.start()
+    sniffing_thread2.start()
 
-    # while True:
-    #     total_in = switch.interfaces_stats["interface1"]["Incoming"]["Total_IN"] + \
-    #                switch.interfaces_stats["interface2"]["Incoming"]["Total_IN"]
-    #     if total_in > 100:
-    #         switch.stop_threads = True  # Nastaví vlajku na zastavenie vlákien
-    #         break  # Vychádza z hlavnej slučky
 
-    # switch.show_interface_stats()
-    # print(switch.switch_table)
 
-    app = GUIApplication()
-    app.add_mac_entry("00:00:00:00:00:02", "00:00:10", "2")
-    app.window.mainloop()
+    # Start the GUI
+    #gui.run()
+
 
 if __name__ == "__main__":
     main()
