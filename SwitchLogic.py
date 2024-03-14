@@ -1,9 +1,10 @@
+import hashlib
+
 from scapy.all import *
 from scapy.layers.l2 import Ether, ARP
 import threading
 
 from scapy.layers.inet import IP, TCP, UDP, ICMP
-from scapy.layers.http import HTTP, HTTPResponse
 #from Switch_GUI import SwitchGUI
 
 class Switch:
@@ -16,59 +17,7 @@ class Switch:
             "eth1": "Realtek USB GbE Family Controller #3"
         }
 
-        #self.switch_gui = switch_gui
-
-        #self.interfaces_stats = {
-        #     "interface1": {
-        #         "Incoming": {
-        #             "Ethernet_IN": 0,
-        #             "IP_IN": 0,
-        #             "ARP_IN": 0,
-        #             "TCP_IN": 0,
-        #             "UDP_IN": 0,
-        #             "ICMP_IN": 0,
-        #             "HTTP_IN": 0,
-        #             "HTTPS_IN": 0,
-        #             "Total_IN": 0,
-        #         },
-        #         "Outgoing": {
-        #             "Ethernet_OUT": 0,
-        #             "IP_OUT": 0,
-        #             "ARP_OUT": 0,
-        #             "TCP_OUT": 0,
-        #             "UDP_OUT": 0,
-        #             "ICMP_OUT": 0,
-        #             "HTTP_OUT": 0,
-        #             "HTTPS_OUT": 0,
-        #             "Total_OUT": 0,
-        #         }
-        #     },
-        #     "interface2": {
-        #         "Incoming": {
-        #             "Ethernet_IN": 0,
-        #             "IP_IN": 0,
-        #             "ARP_IN": 0,
-        #             "TCP_IN": 0,
-        #             "UDP_IN": 0,
-        #             "ICMP_IN": 0,
-        #             "HTTP_IN": 0,
-        #             "HTTPS_IN": 0,
-        #             "Total_IN": 0,
-        #         },
-        #         "Outgoing": {
-        #             "Ethernet_OUT": 0,
-        #             "IP_OUT": 0,
-        #             "ARP_OUT": 0,
-        #             "TCP_OUT": 0,
-        #             "UDP_OUT": 0,
-        #             "ICMP_OUT": 0,
-        #             "HTTP_OUT": 0,
-        #             "HTTPS_OUT": 0,
-        #             "Total_OUT": 0,
-        #         }
-        #     }
-        # }
-
+        self.last_handled_packet_hashes = deque(maxlen=5)
 
         self.interfaces_stats = {
             "interface1": {
@@ -99,33 +48,51 @@ class Switch:
         self.packet_number = 0
     def handle_packet(self, packet, interface_name, target_interface):
 
+        print("---------------------------------------------------------------------------------------")
+        print("Handle packet method")
+
         is_looping = False
+
+        packet_hash = self.get_packet_hash(packet)
+        print(f"Packet hash: {packet_hash}")
 
         # Zisti správny kľúč pre aktuálne rozhranie
         current_interface_key = "interface1" if interface_name == "eth0" else "interface2"
 
-        if Ether in packet:
-            src_mac = packet['Ether'].src
-            dst_mac = packet['Ether'].dst
+        # Check if the packet is in the deque
+        if self.is_packet_in_deque(packet_hash):
+            print("Packet has been handled already. Dropping the packet.")
+            is_looping = True
 
-            # Print source port
-            print("Zdrojovy port je: " + interface_name)
-            print(f"Zdrojová MAC adresa: {src_mac}, Cieľová MAC adresa: {dst_mac}")
+        else:
+            # Add the packet to the deque
+            self.add_packet(packet_hash)
 
-            if self.mac_address_table.get_interface(src_mac) is None:
-                self.mac_address_table.add_entry(src_mac, 0, interface_name)
 
-            # Check if the src mac address is in mac table of switch ports
-            if src_mac in self.switch_ports_mac_address.values():
-                is_looping = True
-
-            #print(f"Interface name is:  + {interface_name} and interface associated with src_mac is: {self.mac_address_table.get_interface(src_mac)}")
-
-            elif self.mac_address_table.get_interface(src_mac) != interface_name:
-                is_looping = True
+        # New logic of handling duplicate traffic in network
 
 
         if not is_looping:
+
+            if Ether in packet:
+                src_mac = packet['Ether'].src
+                dst_mac = packet['Ether'].dst
+
+            # Print source port
+            # print("Zdrojovy port je: " + interface_name)
+            # print(f"Zdrojová MAC adresa: {src_mac}, Cieľová MAC adresa: {dst_mac}")
+
+            # if self.mac_address_table.get_interface(src_mac) is None:
+            # self.mac_address_table.add_entry(src_mac, 0, interface_name)
+
+            # Check if the src mac address is in mac table of switch ports
+            # if src_mac in self.switch_ports_mac_address.values():
+            # is_looping = True
+
+            # print(f"Interface name is:  + {interface_name} and interface associated with src_mac is: {self.mac_address_table.get_interface(src_mac)}")
+
+            # elif self.mac_address_table.get_interface(src_mac) != interface_name:
+            # is_looping = True
 
             protocol_map = {
                 Ether: "Ethernet",
@@ -142,6 +109,15 @@ class Switch:
                 if protocol in packet:
                     self.interfaces_stats[current_interface_key]["Incoming"][key] += 1
 
+
+            # if ICMP in packet:
+            #     print("---------------------------------------------------------------------------------------")
+            #     print("Handle packet method, THIS IS AN ICMP PACKET")
+            #     print("Zdrojovy port je: " + interface_name)
+            #     print(f"Zdrojová MAC adresa: {src_mac}, Cieľová MAC adresa: {dst_mac}")
+            #     print("Sequence number:", packet[ICMP].seq)
+
+
             # Check for HTTP and HTTPS separately as they are identified by destination port
             if TCP in packet:
                 if packet[TCP].dport == 80:
@@ -154,6 +130,8 @@ class Switch:
 
             #self.switch_gui.update_traffic(current_interface_key, "Incoming", stats_values)
 
+
+            print(f"Forwarding packet number {self.packet_number} to {target_interface}.")
             self.forward_packet(packet, target_interface)
 
             # Print total incoming traffic for both interfaces
@@ -161,7 +139,7 @@ class Switch:
             self.packet_number += 1
 
             print(f"Packet number: {self.packet_number}")
-            self.mac_address_table.show_table()
+            #self.mac_address_table.show_table()
 
         #print(f"Total incoming traffic: {self.interfaces_stats['interface1']['Incoming']['Total_IN'] + self.interfaces_stats['interface2']['Incoming']['Total_IN']}")
 
@@ -169,15 +147,6 @@ class Switch:
     #def start_listening(self, interface_name, target_interface):
 
      #   sniff(iface=self.interfaces[interface_name], prn=lambda packet: self.handle_packet(packet, interface_name, target_interface))
-
-    # def start_listening(self, interface_name, target_interface):
-    #     #Úprava: Kontrola `stop_threads` pred a počas príjmu paketov
-    #     def custom_packet_handler(packet):
-    #         if self.stop_threads:  # Ak je vlajka nastavená, prestane počúvať
-    #             return False  # Vráti False pre zastavenie sniffing
-    #         self.handle_packet(packet, interface_name, target_interface)
-    #
-    #     sniff(iface=self.interfaces[interface_name],stop_filter=lambda x: self.stop_threads)
 
     def start_listening(self, interface_name, target_interface):
         # Úprava: Kontrola `stop_threads` pred a počas príjmu paketov
@@ -211,6 +180,9 @@ class Switch:
 
     def forward_packet(self, packet, destination_interface):
 
+
+        print("This is a forwar packet method")
+
         if destination_interface in self.interfaces:
             # Send the packet out of the specified interface
 
@@ -233,6 +205,10 @@ class Switch:
                 if protocol in packet:
                     self.interfaces_stats[current_interface_key]["Outgoing"][key] += 1
 
+            if ICMP in packet:
+                print("This is an ICMP packet that will be forwarded")
+                print("Sequence number of ICMP packet:", packet[ICMP].seq)
+
             # Check for HTTP and HTTPS separately as they are identified by destination port
             if TCP in packet:
                 if packet[TCP].dport == 80:
@@ -244,6 +220,7 @@ class Switch:
             self.interfaces_stats[current_interface_key]["Outgoing"]["Total"] += 1
 
             sendp(packet, iface=self.interfaces[destination_interface], verbose=False)
+            print("---------------------------------------------------------------------------------------")
         else:
             print(f"Cieľové rozhranie {destination_interface} nie je definované.")
 
@@ -271,6 +248,28 @@ class Switch:
             "HTTPS": 0,
             "Total": 0,
         }
+
+    import hashlib
+
+    def get_packet_hash(self, packet):
+        packet_bytes = raw(packet)
+        sha256_hash = hashlib.sha256(packet_bytes).hexdigest()
+        return sha256_hash
+
+    # Function to add a packet to the deque
+    def add_packet(self, packet_hash):
+        #self.last_handled_packets_hashes.append(packet)
+        self.last_handled_packet_hashes.append(packet_hash)
+
+
+    def is_packet_in_deque(self, packet_hash):
+        # Iterate over the deque
+        for p in self.last_handled_packet_hashes:
+            # If the hash of the current packet matches the given hash, return True
+            if p == packet_hash:
+                return True
+        # If no match was found after iterating over the entire deque, return False
+        return False
 
 # Class for mac address table
 
