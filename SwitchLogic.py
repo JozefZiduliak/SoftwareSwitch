@@ -68,6 +68,9 @@ class Switch:
             # Add the packet to the deque
             self.add_packet(packet_hash)
 
+        vales = self.get_traffic_stats(current_interface_key, "Incoming")
+        print(f"Interface {current_interface_key} incoming traffic: {vales}")
+
 
         # New logic of handling duplicate traffic in network
 
@@ -131,12 +134,15 @@ class Switch:
             #self.switch_gui.update_traffic(current_interface_key, "Incoming", stats_values)
 
 
-            print(f"Forwarding packet number {self.packet_number} to {target_interface}.")
+            self.interfaces_stats
+
             self.forward_packet(packet, target_interface)
 
             # Print total incoming traffic for both interfaces
 
             self.packet_number += 1
+
+
 
             print(f"Packet number: {self.packet_number}")
             #self.mac_address_table.show_table()
@@ -225,12 +231,16 @@ class Switch:
             print(f"Cieľové rozhranie {destination_interface} nie je definované.")
 
     def get_traffic_stats(self, interface_name, direction):
+        print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+        print("Get traffic stats method")
         # Check if the interface and direction are valid
         if interface_name in self.interfaces_stats and direction in self.interfaces_stats[interface_name]:
             # Get the stats for the specified interface and direction
             stats_dict = self.interfaces_stats[interface_name][direction]
 
             # Convert the stats dictionary to a list and return it
+            # Print the number of elements in the list
+            print(f"Number of elements in the list: {len(list(stats_dict.values()))}")
             return list(stats_dict.values())
         else:
             print("Invalid interface name or direction.")
@@ -270,6 +280,10 @@ class Switch:
                 return True
         # If no match was found after iterating over the entire deque, return False
         return False
+
+    def set_interface_name(self, interface1, interface2):
+        self.interfaces["eth0"] = interface1
+        self.interfaces["eth1"] = interface2
 
 # Class for mac address table
 

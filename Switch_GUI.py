@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from SwitchLogic import Switch
 import threading
+import time
 
 class SwitchGUI:
     def __init__(self, switch):
@@ -37,11 +38,11 @@ class SwitchGUI:
         nadpis.pack(pady=(10, 20))
 
     def setup_traffic_variables(self):
-        self.incoming_traffic_interface1 = [tk.IntVar(value=5) for _ in range(9)]
-        self.outgoing_traffic_interface1 = [tk.IntVar(value=1) for _ in range(9)]
-        self.incoming_traffic_interface2 = [tk.IntVar(value=2) for _ in range(9)]
-        self.outgoing_traffic_interface2 = [tk.IntVar(value=3) for _ in range(9)]
-        self.incoming_traffic_interface1[2].set(20)  # Príklad zmeny hodnoty
+        self.incoming_traffic_interface1 = [tk.IntVar(value=0) for _ in range(9)]
+        self.outgoing_traffic_interface1 = [tk.IntVar(value=0) for _ in range(9)]
+        self.incoming_traffic_interface2 = [tk.IntVar(value=0) for _ in range(9)]
+        self.outgoing_traffic_interface2 = [tk.IntVar(value=0) for _ in range(9)]
+        #self.incoming_traffic_interface1[8].set(20)  # Príklad zmeny hodnoty
 
     def setup_buttons(self):
         tk.Button(self.root, text="Start", font=('Arial', 10), command=self.start_action).place(x=520, y=50)
@@ -70,6 +71,7 @@ class SwitchGUI:
         protocols = ["Ethernet II", "IP", "ARP", "TCP", "UDP", "ICMP", "HTTP", "HTTPS", "Total"]
         for i, protocol in enumerate(protocols):
             tk.Label(self.root, text=protocol, font=('Arial', 14)).place(x=120, y=120 + i * 30)
+            print(i)
             tk.Label(self.root, textvariable=self.incoming_traffic_interface1[i], font=('Arial', 14)).place(x=50, y=120 + i * 30)
             tk.Label(self.root, textvariable=self.outgoing_traffic_interface1[i], font=('Arial', 14)).place(x=250, y=120 + i * 30)
             tk.Label(self.root, text=protocol, font=('Arial', 14)).place(x=1100, y=120 + i * 30)
@@ -109,35 +111,62 @@ class SwitchGUI:
         interface1 = self.interface1_entry.get()
         interface2 = self.interface2_entry.get()
 
+        interface1 = "Realtek USB GbE Family Controller"
+        interface2 = "Realtek USB GbE Family Controller #11"
+
+        print(interface1)
+        print(interface2)
+
         self.switch.set_interface_name(interface1, interface2)
 
+        # Start the threads that sniff, handle and forward the packets
         sniffing_thread1 = threading.Thread(target=self.switch.start_listening, args=("eth0", "eth1"))
         sniffing_thread2 = threading.Thread(target=self.switch.start_listening, args=("eth1", "eth0"))
 
-        sniffing_thread1.start()
+        updating_thread = threading.Thread(target=self.update_traffic)
 
+        sniffing_thread1.start()
+        sniffing_thread2.start()
+        self.incoming_traffic_interface1[8].set(20)  # Príklad zmeny hodnoty
+        updating_thread.start()
 
     def run(self):
         self.root.mainloop()
 
-    def update_traffic(self, interface, in_or_out, values):
-        if interface == "interface1":
-            if in_or_out == "Incoming":
-                for i in range(9):
-                    self.incoming_traffic_interface1[i].set(values[i])
-            else:
-                for i in range(9):
-                    self.outgoing_traffic_interface1[i].set(values[i])
+    def update_traffic(self):
 
-        else:
-            if in_or_out == "Incoming":
-                for i in range(9):
-                    self.incoming_traffic_interface2[i].set(values[i])
-            else:
-                for i in range(9):
-                    self.outgoing_traffic_interface2[i].set(values[i])
+        while True:  # Assuming stop_threads is a flag to stop threads
+            # Updating incoming stats for interface 1
+            interface1_incoming_stats = self.switch.get_traffic_stats("interface1", "Incoming")
 
 
-if __name__ == "__main__":
-    app = SwitchGUI()
-    app.run()
+            for i in range(9):
+                self.incoming_traffic_interface1[i].set(interface1_incoming_stats[i])
+
+            # Updating outgoing stats for interface 1
+            interface1_outgoing_stats = self.switch.get_traffic_stats("interface1", "Outgoing")
+            for i in range(9):
+                self.outgoing_traffic_interface1[i].set(interface1_outgoing_stats[i])
+
+            # Updating incoming stats for interface 2
+            interface2_incoming_stats = self.switch.get_traffic_stats("interface2", "Incoming")
+            for i in range(9):
+                self.incoming_traffic_interface2[i].set(interface2_incoming_stats[i])
+
+            # Updating outgoing stats for interface 2
+            interface2_outgoing_stats = self.switch.get_traffic_stats("interface2", "Outgoing")
+            for i in range(9):
+                self.outgoing_traffic_interface2[i].set(interface2_outgoing_stats[i])
+
+            time.sleep(1)  # Pause for a while before the next update
+
+        # #Print the stats
+        # print("Interface 1 incoming: ", interface1_incoming_stats)
+        # print("Interface 1 outgoing: ", interface1_outgoing_stats)
+        # print("Interface 2 incoming: ", interface2_incoming_stats)
+        # print("Interface 2 outgoing: ", interface2_outgoing_stats)
+
+
+# if __name__ == "__main__":
+#     app = SwitchGUI()
+#     app.run()
