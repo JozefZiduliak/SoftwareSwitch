@@ -1,11 +1,8 @@
 import hashlib
-
 from scapy.all import *
 from scapy.layers.l2 import Ether, ARP
-import threading
-
 from scapy.layers.inet import IP, TCP, UDP, ICMP
-#from Switch_GUI import SwitchGUI
+from MacAddressTable import MacAddressTable
 
 class Switch:
 
@@ -17,7 +14,7 @@ class Switch:
             "eth1": "Realtek USB GbE Family Controller #3"
         }
 
-        self.last_handled_packet_hashes = deque(maxlen=5)
+        self.last_handled_packet_hashes = deque(maxlen=20)
 
         self.interfaces_stats = {
             "interface1": {
@@ -48,20 +45,20 @@ class Switch:
         self.packet_number = 0
     def handle_packet(self, packet, interface_name, target_interface):
 
-        print("---------------------------------------------------------------------------------------")
-        print("Handle packet method")
+        #print("---------------------------------------------------------------------------------------")
+        #print("Handle packet method")
 
         is_looping = False
 
         packet_hash = self.get_packet_hash(packet)
-        print(f"Packet hash: {packet_hash}")
+        #print(f"Packet hash: {packet_hash}")
 
         # Zisti správny kľúč pre aktuálne rozhranie
         current_interface_key = "interface1" if interface_name == "eth0" else "interface2"
 
         # Check if the packet is in the deque
         if self.is_packet_in_deque(packet_hash):
-            print("Packet has been handled already. Dropping the packet.")
+            #print("Packet has been handled already. Dropping the packet.")
             is_looping = True
 
         else:
@@ -69,7 +66,7 @@ class Switch:
             self.add_packet(packet_hash)
 
         vales = self.get_traffic_stats(current_interface_key, "Incoming")
-        print(f"Interface {current_interface_key} incoming traffic: {vales}")
+        #print(f"Interface {current_interface_key} incoming traffic: {vales}")
 
 
         # New logic of handling duplicate traffic in network
@@ -86,8 +83,10 @@ class Switch:
             # print(f"Zdrojová MAC adresa: {src_mac}, Cieľová MAC adresa: {dst_mac}")
 
             # if self.mac_address_table.get_interface(src_mac) is None:
-            # self.mac_address_table.add_entry(src_mac, 0, interface_name)
+                if src_mac != "14-4F-D7-C5-30-51" or src_mac != "00-E0-4C-68-03-C4":
+                    self.mac_address_table.add_entry(src_mac, 15, interface_name)
 
+                #self.decrement_mac_table_timer()
             # Check if the src mac address is in mac table of switch ports
             # if src_mac in self.switch_ports_mac_address.values():
             # is_looping = True
@@ -133,9 +132,6 @@ class Switch:
 
             #self.switch_gui.update_traffic(current_interface_key, "Incoming", stats_values)
 
-
-            self.interfaces_stats
-
             self.forward_packet(packet, target_interface)
 
             # Print total incoming traffic for both interfaces
@@ -144,7 +140,7 @@ class Switch:
 
 
 
-            print(f"Packet number: {self.packet_number}")
+            #print(f"Packet number: {self.packet_number}")
             #self.mac_address_table.show_table()
 
         #print(f"Total incoming traffic: {self.interfaces_stats['interface1']['Incoming']['Total_IN'] + self.interfaces_stats['interface2']['Incoming']['Total_IN']}")
@@ -176,9 +172,9 @@ class Switch:
                 print(f"\n  {direction.capitalize()} Traffic:")
                 # Iterating through each traffic type and printing its count
                 for traffic_type, count in stats.items():
-                    # Printing each traffic type's count in a readable format
+                    #Printing each traffic type's count in a readable format
                     print(f"    {traffic_type}: {count}")
-                print("")  # Adding a newline for better readability between sections
+                    print("")  # Adding a newline for better readability between sections
 
             # Separating interfaces for clarity
             print("======================================\n")
@@ -187,7 +183,7 @@ class Switch:
     def forward_packet(self, packet, destination_interface):
 
 
-        print("This is a forwar packet method")
+        #print("This is a forwar packet method")
 
         if destination_interface in self.interfaces:
             # Send the packet out of the specified interface
@@ -211,9 +207,9 @@ class Switch:
                 if protocol in packet:
                     self.interfaces_stats[current_interface_key]["Outgoing"][key] += 1
 
-            if ICMP in packet:
-                print("This is an ICMP packet that will be forwarded")
-                print("Sequence number of ICMP packet:", packet[ICMP].seq)
+            #if ICMP in packet:
+                #print("This is an ICMP packet that will be forwarded")
+                #print("Sequence number of ICMP packet:", packet[ICMP].seq)
 
             # Check for HTTP and HTTPS separately as they are identified by destination port
             if TCP in packet:
@@ -225,14 +221,17 @@ class Switch:
             # Increment the total outgoing traffic count
             self.interfaces_stats[current_interface_key]["Outgoing"]["Total"] += 1
 
-            sendp(packet, iface=self.interfaces[destination_interface], verbose=False)
-            print("---------------------------------------------------------------------------------------")
-        else:
-            print(f"Cieľové rozhranie {destination_interface} nie je definované.")
+            if destination_interface in self.interfaces:
+                try:
+                    # Attempt to send the packet out of the specified interface
+                    sendp(packet, iface=self.interfaces[destination_interface], verbose=False)
+                except OSError as e:
+                    # Handle the error gracefully
+                    print(f"Error sending packet through interface {destination_interface}: {e}")
+            else:
+                print(f"Cieľové rozhranie {destination_interface} nie je definované.")
 
     def get_traffic_stats(self, interface_name, direction):
-        print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-        print("Get traffic stats method")
         # Check if the interface and direction are valid
         if interface_name in self.interfaces_stats and direction in self.interfaces_stats[interface_name]:
             # Get the stats for the specified interface and direction
@@ -240,10 +239,10 @@ class Switch:
 
             # Convert the stats dictionary to a list and return it
             # Print the number of elements in the list
-            print(f"Number of elements in the list: {len(list(stats_dict.values()))}")
+            #print(f"Number of elements in the list: {len(list(stats_dict.values()))}")
             return list(stats_dict.values())
         else:
-            print("Invalid interface name or direction.")
+           # print("Invalid interface name or direction.")
             return []
 
     def generate_stats_dict(self):
@@ -285,41 +284,46 @@ class Switch:
         self.interfaces["eth0"] = interface1
         self.interfaces["eth1"] = interface2
 
-# Class for mac address table
+    def return_mac_table(self):
+        return self.mac_address_table.get_table()
 
-class MacAddressTable:
-
-        def __init__(self):
-            self.table = {}
-
-        def add_entry(self, mac_address, timer, interface):
-            self.table[mac_address] = {
-                "timer": timer,
-                "interface": interface
-            }
-
-        def show_table(self):
-            print("MAC Address Table:\n")
-            for mac_address, entry in self.table.items():
-                print(f"MAC Address: {mac_address}, Timer: {entry['timer']}, Interface: {entry['interface']}")
-            print("======================================\n")
-
-        def remove_entry(self, mac_address):
-            if mac_address in self.table:
-                del self.table[mac_address]
-                print(f"Záznam pre MAC adresu {mac_address} bol odstránený.")
-            else:
-                print(f"Záznam pre MAC adresu {mac_address} neexistuje.")
+    # Method that decrement timer for each mac address in mac table
+    # def decrement_mac_table_timer(self):
+    #     for mac_address, entry in self.mac_address_table.get_table().items():
+    #         entry["timer"] -= 1
+    #         if entry["timer"] == 0:
+    #             self.mac_address_table.remove_entry(mac_address)
 
 
-        # Return interface for mac address
-        def get_interface(self, mac_address):
-            if mac_address in self.table:
-                return self.table[mac_address]["interface"]
-            else:
-                return None
+    # Method that decrement timer for each mac address in mac table
+    # def decrement_mac_table_timer(self):
+    #
+    #     while True:
+    #         print("---------------------------------------------")
+    #         print("Decrementing mac table timer")
+    #         for mac_address, entry in self.mac_address_table.get_table().items():
+    #             entry["timer"] = int(entry["timer"]) - 1
+    #
+    #             if entry["timer"] == 0:
+    #                 self.mac_address_table.remove_entry(mac_address)
+    #
+    #         time.sleep(1)
 
+    def decrement_mac_table_timer(self):
+        while True:
+            # Create a copy of the keys
+            mac_addresses = list(self.mac_address_table.get_table().keys())
+            for mac_address in mac_addresses:
+                entry = self.mac_address_table.get_table().get(mac_address)
+                # Check if the entry still exists
+                if entry is not None:
+                    entry["timer"] = int(entry["timer"]) - 1
+                    if entry["timer"] == 0:
+                        self.mac_address_table.remove_entry(mac_address)
+            time.sleep(1)
 
+    def clear_mac_table(self):
+        self.mac_address_table.clear_table()
 
 
 if __name__ == "__main__":

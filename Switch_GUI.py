@@ -15,6 +15,8 @@ class SwitchGUI:
         # Nadpis
         self.setup_title()
 
+        self.setup_timer_input_field()
+
         # Inicializácia premenných pre dopravu a ich nastavenie
         self.setup_traffic_variables()
 
@@ -48,7 +50,7 @@ class SwitchGUI:
         tk.Button(self.root, text="Start", font=('Arial', 10), command=self.start_action).place(x=520, y=50)
         tk.Button(self.root, text="Stop", font=('Arial', 10), command=self.start_action).place(x=740, y=50)
         tk.Button(self.root, text="Refresh Interface list", font=('Arial', 10), command=self.start_action).place(x=585, y=50)
-        tk.Button(self.root, text="Clear", font=('Arial', 10), command=self.start_action).place(x=350, y=350)
+        tk.Button(self.root, text="Clear", font=('Arial', 10), command=self.clear_mac_table).place(x=350, y=350)
 
 
     # Input fields and text above them
@@ -67,11 +69,16 @@ class SwitchGUI:
         self.interface2_entry = tk.Entry(self.root, font=('Arial', 18))
         self.interface2_entry.place(x=self.width - 210, y=50, width=200)
 
+    def setup_timer_input_field(self):
+        tk.Label(self.root, text="Timer:", font=('Arial', 18)).place(x=830, y=350)  # Adjust the position as needed
+        self.timer_entry = tk.Entry(self.root, font=('Arial', 18))
+        self.timer_entry.place(x=900, y=350, width=50)  # Adjust the position as needed
+
+
     def setup_protocols_display(self):
         protocols = ["Ethernet II", "IP", "ARP", "TCP", "UDP", "ICMP", "HTTP", "HTTPS", "Total"]
         for i, protocol in enumerate(protocols):
             tk.Label(self.root, text=protocol, font=('Arial', 14)).place(x=120, y=120 + i * 30)
-            print(i)
             tk.Label(self.root, textvariable=self.incoming_traffic_interface1[i], font=('Arial', 14)).place(x=50, y=120 + i * 30)
             tk.Label(self.root, textvariable=self.outgoing_traffic_interface1[i], font=('Arial', 14)).place(x=250, y=120 + i * 30)
             tk.Label(self.root, text=protocol, font=('Arial', 14)).place(x=1100, y=120 + i * 30)
@@ -90,10 +97,23 @@ class SwitchGUI:
         self.mac_table.heading("timer", text="Timer", anchor=tk.CENTER)
         self.mac_table.heading("port", text="Port", anchor=tk.CENTER)
         self.mac_table.place(x=350, y=150, width=600, height=200)
-        self.add_record_to_mac_table('00:0a:95:9d:68:16', '300', '1')
+        #self.add_record_to_mac_table('00:0a:95:9d:68:16', '300', '1')
 
     def add_record_to_mac_table(self, mac_address, timer, port):
         self.mac_table.insert('', 'end', values=(mac_address, timer, port))
+
+
+    # Method that removes all entries from mac table in GUI, so new ones can be added
+    def refresh_mac_table(self):
+        for i in self.mac_table.get_children():
+            self.mac_table.delete(i)
+
+        # Remove all entries from data strcutures in SwitchLogic
+        #self.switch.refresh_mac_table()
+
+    def clear_mac_table(self):
+        self.refresh_mac_table()
+        self.switch.clear_mac_table()
 
     def start_action(self):
         # interface1 = self.interface1_entry.get()
@@ -111,11 +131,8 @@ class SwitchGUI:
         interface1 = self.interface1_entry.get()
         interface2 = self.interface2_entry.get()
 
-        interface1 = "Realtek USB GbE Family Controller"
-        interface2 = "Realtek USB GbE Family Controller #11"
-
-        print(interface1)
-        print(interface2)
+        interface1 = "Realtek USB GbE Family Controller #11"
+        interface2 = "Realtek USB GbE Family Controller"
 
         self.switch.set_interface_name(interface1, interface2)
 
@@ -124,11 +141,12 @@ class SwitchGUI:
         sniffing_thread2 = threading.Thread(target=self.switch.start_listening, args=("eth1", "eth0"))
 
         updating_thread = threading.Thread(target=self.update_traffic)
+        decrementing_thread = threading.Thread(target=self.switch.decrement_mac_table_timer)
 
         sniffing_thread1.start()
         sniffing_thread2.start()
-        self.incoming_traffic_interface1[8].set(20)  # Príklad zmeny hodnoty
         updating_thread.start()
+        decrementing_thread.start()
 
     def run(self):
         self.root.mainloop()
@@ -160,11 +178,14 @@ class SwitchGUI:
 
             time.sleep(1)  # Pause for a while before the next update
 
-        # #Print the stats
-        # print("Interface 1 incoming: ", interface1_incoming_stats)
-        # print("Interface 1 outgoing: ", interface1_outgoing_stats)
-        # print("Interface 2 incoming: ", interface2_incoming_stats)
-        # print("Interface 2 outgoing: ", interface2_outgoing_stats)
+            # Remove old entries from the mac address table
+
+            self.refresh_mac_table()
+            mac_address_table = self.switch.return_mac_table()
+
+            for mac_address, entry in mac_address_table.items():
+                self.add_record_to_mac_table(mac_address, entry['timer'], entry['interface'])
+
 
 
 # if __name__ == "__main__":
