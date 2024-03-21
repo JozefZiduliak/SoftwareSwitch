@@ -3,16 +3,20 @@ from scapy.all import *
 from scapy.layers.l2 import Ether, ARP
 from scapy.layers.inet import IP, TCP, UDP, ICMP
 from MacAddressTable import MacAddressTable
+import time
 
 class Switch:
 
     #def __init__(self, switch_gui: SwitchGUI):
     def __init__(self):
 
+        self.mac_addresses_to_ignore = ["14:4f:d7:c5:30:51", "00:e0:4c:42:6c:80", "f8:e9:4f:5b:91:89", "f8:e9:4f:76:f8:0a"]
+
         self.interfaces = {
-            "eth0": "Realtek USB GbE Family Controller",
-            "eth1": "Realtek USB GbE Family Controller #3"
+
         }
+
+        self.stats_lock = threading.Lock()
 
         self.last_handled_packet_hashes = deque(maxlen=20)
 
@@ -43,58 +47,53 @@ class Switch:
         self.stop_threads = False
 
         self.packet_number = 0
-    def handle_packet(self, packet, interface_name, target_interface):
+    def handle_packet(self, packet, interface_name):
 
-        #print("---------------------------------------------------------------------------------------")
-        #print("Handle packet method")
+        # print("---------------------------------------------------------------------------------------")
+        # print("Handle packet method")
 
         is_looping = False
 
         packet_hash = self.get_packet_hash(packet)
-        #print(f"Packet hash: {packet_hash}")
+
+        # print(f"Current interface name: {interface_name}")
 
         # Zisti správny kľúč pre aktuálne rozhranie
-        current_interface_key = "interface1" if interface_name == "eth0" else "interface2"
+        current_interface_key = "interface1" if interface_name == "Ethernet 0" else "interface2"
+
+        # print(f"Current interface key: {current_interface_key}")
+
+
+        # Check if the deque contains old entries and clear them
+        self.check_and_clear_deque()
 
         # Check if the packet is in the deque
         if self.is_packet_in_deque(packet_hash):
-            #print("Packet has been handled already. Dropping the packet.")
+
             is_looping = True
 
         else:
             # Add the packet to the deque
             self.add_packet(packet_hash)
 
-        vales = self.get_traffic_stats(current_interface_key, "Incoming")
-        #print(f"Interface {current_interface_key} incoming traffic: {vales}")
-
 
         # New logic of handling duplicate traffic in network
-
-
         if not is_looping:
+
 
             if Ether in packet:
                 src_mac = packet['Ether'].src
                 dst_mac = packet['Ether'].dst
 
-            # Print source port
-            # print("Zdrojovy port je: " + interface_name)
-            # print(f"Zdrojová MAC adresa: {src_mac}, Cieľová MAC adresa: {dst_mac}")
+                if src_mac in self.mac_addresses_to_ignore:
+                    return None
 
-            # if self.mac_address_table.get_interface(src_mac) is None:
-                if src_mac != "14-4F-D7-C5-30-51" or src_mac != "00-E0-4C-68-03-C4":
-                    self.mac_address_table.add_entry(src_mac, 15, interface_name)
+                # Add later logic for ignoring packets from switch itself
+                self.mac_address_table.add_entry(src_mac, 15, interface_name)
 
-                #self.decrement_mac_table_timer()
-            # Check if the src mac address is in mac table of switch ports
-            # if src_mac in self.switch_ports_mac_address.values():
-            # is_looping = True
+            else:
+                return None
 
-            # print(f"Interface name is:  + {interface_name} and interface associated with src_mac is: {self.mac_address_table.get_interface(src_mac)}")
-
-            # elif self.mac_address_table.get_interface(src_mac) != interface_name:
-            # is_looping = True
 
             protocol_map = {
                 Ether: "Ethernet",
@@ -105,59 +104,68 @@ class Switch:
                 ICMP: "ICMP"
             }
 
-            # Iterate over the protocol_map
-            for protocol, key in protocol_map.items():
-                # If the packet is of the current protocol type, increment the corresponding count
-                if protocol in packet:
-                    self.interfaces_stats[current_interface_key]["Incoming"][key] += 1
+            with self.stats_lock:
+
+                # Iterate over the protocol_map
+                for protocol, key in protocol_map.items():
+                    # If the packet is of the current protocol type, increment the corresponding count
+                    if protocol in packet:
+                        self.interfaces_stats[current_interface_key]["Incoming"][key] += 1
+
+                # Check for HTTP and HTTPS separately as they are identified by destination port
+                if TCP in packet:
+                    if packet[TCP].dport == 80:
+                        self.interfaces_stats[current_interface_key]["Incoming"]["HTTP"] += 1
+                    elif packet[TCP].dport == 443:
+                        self.interfaces_stats[current_interface_key]["Incoming"]["HTTPS"] += 1
+
+                # Increment the total incoming traffic count
+                self.interfaces_stats[current_interface_key]["Incoming"]["Total"] += 1
 
 
-            # if ICMP in packet:
-            #     print("---------------------------------------------------------------------------------------")
-            #     print("Handle packet method, THIS IS AN ICMP PACKET")
-            #     print("Zdrojovy port je: " + interface_name)
-            #     print(f"Zdrojová MAC adresa: {src_mac}, Cieľová MAC adresa: {dst_mac}")
-            #     print("Sequence number:", packet[ICMP].seq)
+            # Is it broadcast?
+            if packet[Ether].dst == "ff:ff:ff:ff:ff:ff":
+
+                #Send it out of the other interface
+                # Loop through the interfaces
+                for interface in self.interfaces:
+                    # If the current interface is not the one the packet came from, forward the packet
+                    if interface != interface_name:
+                        self.forward_packet(packet, interface)
 
 
-            # Check for HTTP and HTTPS separately as they are identified by destination port
-            if TCP in packet:
-                if packet[TCP].dport == 80:
-                    self.interfaces_stats[current_interface_key]["Incoming"]["HTTP"] += 1
-                elif packet[TCP].dport == 443:
-                    self.interfaces_stats[current_interface_key]["Incoming"]["HTTPS"] += 1
+            else:
+                # Check if the destination MAC address is in the MAC address table
+                if packet[Ether].dst in self.mac_address_table.get_table():
 
-            # Increment the total incoming traffic count
-            self.interfaces_stats[current_interface_key]["Incoming"]["Total"] += 1
+                    # Get the interface associated with the destination MAC address
+                    destination_interface = self.mac_address_table.get_interface(packet[Ether].dst)
 
-            #self.switch_gui.update_traffic(current_interface_key, "Incoming", stats_values)
+                    if destination_interface != interface_name:
+                        # Forward the packet out of the interface associated with the destination MAC address
+                        self.forward_packet(packet, destination_interface)
 
-            self.forward_packet(packet, target_interface)
-
-            # Print total incoming traffic for both interfaces
+                else:
+                    # If the destination MAC address is not in the MAC address table, broadcast the packet
+                    # Loop through the interfaces
+                    for interface in self.interfaces:
+                        # If the current interface is not the one the packet came from, forward the packet
+                        if interface != interface_name:
+                            self.forward_packet(packet, interface)
 
             self.packet_number += 1
 
 
 
-            #print(f"Packet number: {self.packet_number}")
-            #self.mac_address_table.show_table()
-
-        #print(f"Total incoming traffic: {self.interfaces_stats['interface1']['Incoming']['Total_IN'] + self.interfaces_stats['interface2']['Incoming']['Total_IN']}")
-
-
-    #def start_listening(self, interface_name, target_interface):
-
-     #   sniff(iface=self.interfaces[interface_name], prn=lambda packet: self.handle_packet(packet, interface_name, target_interface))
-
-    def start_listening(self, interface_name, target_interface):
+    def start_listening(self, interface_name):
         # Úprava: Kontrola `stop_threads` pred a počas príjmu paketov
         def custom_packet_handler(packet):
             if self.stop_threads:  # Ak je vlajka nastavená, prestane počúvať
                 return False  # Vráti False pre zastavenie sniffing
-            self.handle_packet(packet, interface_name, target_interface)
+            self.handle_packet(packet, interface_name)
 
         sniff(iface=self.interfaces[interface_name], prn=custom_packet_handler, stop_filter=lambda x: self.stop_threads)
+
 
     def show_interface_stats(self):
         # Header for the stats display
@@ -189,7 +197,7 @@ class Switch:
             # Send the packet out of the specified interface
 
             # Zisti správny kľúč pre aktuálne rozhranie
-            current_interface_key = "interface1" if destination_interface == "eth0" else "interface2"
+            current_interface_key = "interface1" if destination_interface == "Ethernet 0" else "interface2"
 
             # Define a dictionary to map protocol types to their keys in interfaces_stats
             protocol_map = {
@@ -201,25 +209,26 @@ class Switch:
                 ICMP: "ICMP"
             }
 
-            # Iterate over the protocol_map
-            for protocol, key in protocol_map.items():
-                # If the packet is of the current protocol type, increment the corresponding count
-                if protocol in packet:
-                    self.interfaces_stats[current_interface_key]["Outgoing"][key] += 1
+            with self.stats_lock:
+                # Iterate over the protocol_map
+                for protocol, key in protocol_map.items():
+                    # If the packet is of the current protocol type, increment the corresponding count
+                    if protocol in packet:
+                        self.interfaces_stats[current_interface_key]["Outgoing"][key] += 1
 
-            #if ICMP in packet:
-                #print("This is an ICMP packet that will be forwarded")
-                #print("Sequence number of ICMP packet:", packet[ICMP].seq)
+                #if ICMP in packet:
+                    #print("This is an ICMP packet that will be forwarded")
+                    #print("Sequence number of ICMP packet:", packet[ICMP].seq)
 
-            # Check for HTTP and HTTPS separately as they are identified by destination port
-            if TCP in packet:
-                if packet[TCP].dport == 80:
-                    self.interfaces_stats[current_interface_key]["Outgoing"]["HTTP"] += 1
-                elif packet[TCP].dport == 443:
-                    self.interfaces_stats[current_interface_key]["Outgoing"]["HTTPS"] += 1
+                # Check for HTTP and HTTPS separately as they are identified by destination port
+                if TCP in packet:
+                    if packet[TCP].dport == 80:
+                        self.interfaces_stats[current_interface_key]["Outgoing"]["HTTP"] += 1
+                    elif packet[TCP].dport == 443:
+                        self.interfaces_stats[current_interface_key]["Outgoing"]["HTTPS"] += 1
 
-            # Increment the total outgoing traffic count
-            self.interfaces_stats[current_interface_key]["Outgoing"]["Total"] += 1
+                # Increment the total outgoing traffic count
+                self.interfaces_stats[current_interface_key]["Outgoing"]["Total"] += 1
 
             if destination_interface in self.interfaces:
                 try:
@@ -265,49 +274,59 @@ class Switch:
         sha256_hash = hashlib.sha256(packet_bytes).hexdigest()
         return sha256_hash
 
-    # Function to add a packet to the deque
-    def add_packet(self, packet_hash):
-        #self.last_handled_packets_hashes.append(packet)
-        self.last_handled_packet_hashes.append(packet_hash)
+    #Function to add a packet to the deque
+    # def add_packet(self, packet_hash):
+    #     #self.last_handled_packets_hashes.append(packet)
+    #     self.last_handled_packet_hashes.append(packet_hash)
 
+    def add_packet(self, packet_hash):
+        # Add the packet hash and the current time to the deque
+        self.last_handled_packet_hashes.append((packet_hash, time.time()))
+
+    # def is_packet_in_deque(self, packet_hash):
+    #     # Iterate over the deque
+    #     for p in self.last_handled_packet_hashes:
+    #         # If the hash of the current packet matches the given hash, return True
+    #         if p == packet_hash:
+    #             return True
+    #     # If no match was found after iterating over the entire deque, return False
+    #     return False
 
     def is_packet_in_deque(self, packet_hash):
         # Iterate over the deque
-        for p in self.last_handled_packet_hashes:
+        for p, _ in self.last_handled_packet_hashes:
             # If the hash of the current packet matches the given hash, return True
             if p == packet_hash:
                 return True
         # If no match was found after iterating over the entire deque, return False
         return False
 
+    # def check_and_clear_deque(self):
+    #     # If the deque is not empty
+    #     if self.last_handled_packet_hashes:
+    #         # Get the time the newest packet was added
+    #         _, newest_time = self.last_handled_packet_hashes[-1]
+    #         # If more than 5 seconds have passed since the newest packet was added
+    #         if time.time() - newest_time > 5:
+    #             # Clear the deque
+    #             self.last_handled_packet_hashes.clear()
+
+    def check_and_clear_deque(self):
+        # If the deque is not empty
+        if self.last_handled_packet_hashes:
+            # Get the time the first packet was added
+            _, oldest_time = self.last_handled_packet_hashes[0]
+            # If more than 5 seconds have passed since the first packet was added
+            if time.time() - oldest_time > 10:
+                # Clear the deque
+                self.last_handled_packet_hashes.clear()
+
     def set_interface_name(self, interface1, interface2):
-        self.interfaces["eth0"] = interface1
-        self.interfaces["eth1"] = interface2
+        self.interfaces["Ethernet 0"] = interface1
+        self.interfaces["Ethernet 1"] = interface2
 
     def return_mac_table(self):
         return self.mac_address_table.get_table()
-
-    # Method that decrement timer for each mac address in mac table
-    # def decrement_mac_table_timer(self):
-    #     for mac_address, entry in self.mac_address_table.get_table().items():
-    #         entry["timer"] -= 1
-    #         if entry["timer"] == 0:
-    #             self.mac_address_table.remove_entry(mac_address)
-
-
-    # Method that decrement timer for each mac address in mac table
-    # def decrement_mac_table_timer(self):
-    #
-    #     while True:
-    #         print("---------------------------------------------")
-    #         print("Decrementing mac table timer")
-    #         for mac_address, entry in self.mac_address_table.get_table().items():
-    #             entry["timer"] = int(entry["timer"]) - 1
-    #
-    #             if entry["timer"] == 0:
-    #                 self.mac_address_table.remove_entry(mac_address)
-    #
-    #         time.sleep(1)
 
     def decrement_mac_table_timer(self):
         while True:

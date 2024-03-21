@@ -11,11 +11,15 @@ class SwitchGUI:
         self.width = 1300
         self.height = 600
         self.root.geometry(f'{self.width}x{self.height}')
+        self.timer_var = None
+        self.interface1_entry = None
+        self.timer_value = 0
+        self.change_occured = None
 
         # Nadpis
         self.setup_title()
 
-        self.setup_timer_input_field()
+        #self.setup_timer_input_field()
 
         # Inicializácia premenných pre dopravu a ich nastavenie
         self.setup_traffic_variables()
@@ -69,10 +73,22 @@ class SwitchGUI:
         self.interface2_entry = tk.Entry(self.root, font=('Arial', 18))
         self.interface2_entry.place(x=self.width - 210, y=50, width=200)
 
-    def setup_timer_input_field(self):
-        tk.Label(self.root, text="Timer:", font=('Arial', 18)).place(x=830, y=350)  # Adjust the position as needed
-        self.timer_entry = tk.Entry(self.root, font=('Arial', 18))
-        self.timer_entry.place(x=900, y=350, width=50)  # Adjust the position as needed
+    # def setup_timer_input_field(self):
+    #     tk.Label(self.root, text="Timer:", font=('Arial', 18)).place(x=830, y=350)  # Adjust the position as needed
+    #     self.timer_entry = tk.Entry(self.root, font=('Arial', 18))
+    #     self.timer_entry.place(x=900, y=350, width=50)  # Adjust the position as needed
+    #
+    # def setup_timer_input_field(self):
+    #     self.timer_var = tk.StringVar()  # Create a StringVar instance
+    #     #self.timer_var.trace('w', self.update_timer)  # Call update_timer when the value changes
+    #     self.timer_var.trace('w', self.change_occured)  # Call update_timer when the value changes
+    #
+    #     tk.Label(self.root, text="Timer:", font=('Arial', 18)).place(x=830, y=350)
+    #     self.timer_entry = tk.Entry(self.root, font=('Arial', 18), textvariable=self.timer_var)
+    #     self.timer_entry.place(x=900, y=350, width=50)
+    #
+    # def change_occured(self, *args):
+    #     print("Change occured. New value:", self.timer_var.get())
 
 
     def setup_protocols_display(self):
@@ -134,11 +150,12 @@ class SwitchGUI:
         interface1 = "Realtek USB GbE Family Controller #11"
         interface2 = "Realtek USB GbE Family Controller"
 
+        # Potentionally cause of issue
         self.switch.set_interface_name(interface1, interface2)
 
         # Start the threads that sniff, handle and forward the packets
-        sniffing_thread1 = threading.Thread(target=self.switch.start_listening, args=("eth0", "eth1"))
-        sniffing_thread2 = threading.Thread(target=self.switch.start_listening, args=("eth1", "eth0"))
+        sniffing_thread1 = threading.Thread(target=self.switch.start_listening, args=("Ethernet 0",))
+        sniffing_thread2 = threading.Thread(target=self.switch.start_listening, args=("Ethernet 1",))
 
         updating_thread = threading.Thread(target=self.update_traffic)
         decrementing_thread = threading.Thread(target=self.switch.decrement_mac_table_timer)
