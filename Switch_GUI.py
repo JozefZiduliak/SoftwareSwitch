@@ -16,6 +16,8 @@ class SwitchGUI:
         self.timer_value = 0
         self.change_occured = None
 
+        self.timer_entry = None
+
         # Nadpis
         self.setup_title()
 
@@ -39,6 +41,11 @@ class SwitchGUI:
         # Reference for the switch
         self.switch = switch
 
+        # Timer input field
+        self.setup_timer_input_field()
+
+
+
     def setup_title(self):
         nadpis = tk.Label(self.root, text="PSIP L2 SWITCH", font=('Arial', 24))
         nadpis.pack(pady=(10, 20))
@@ -55,6 +62,7 @@ class SwitchGUI:
         tk.Button(self.root, text="Stop", font=('Arial', 10), command=self.start_action).place(x=740, y=50)
         tk.Button(self.root, text="Refresh Interface list", font=('Arial', 10), command=self.start_action).place(x=585, y=50)
         tk.Button(self.root, text="Clear", font=('Arial', 10), command=self.clear_mac_table).place(x=350, y=350)
+        tk.Button(self.root, text="UPDATE", font=('Arial', 10), command=self.update_timer).place(x=885, y=350)  # Adjust the positio
 
 
     # Input fields and text above them
@@ -72,6 +80,16 @@ class SwitchGUI:
         tk.Label(self.root, text="Interface 2", font=('Arial', 18)).place(x=self.width - 210, y=10)
         self.interface2_entry = tk.Entry(self.root, font=('Arial', 18))
         self.interface2_entry.place(x=self.width - 210, y=50, width=200)
+
+    def setup_timer_input_field(self):
+
+        tk.Label(self.root, text="TIMER VALUE:", font=('Arial', 18)).place(x=670, y=350)
+
+        self.timer_entry = tk.Entry(self.root, font=('Arial', 18))
+        self.timer_entry.place(x=835, y=350, width=50)  # Adjust the position and width as needed
+
+
+
 
     # def setup_timer_input_field(self):
     #     tk.Label(self.root, text="Timer:", font=('Arial', 18)).place(x=830, y=350)  # Adjust the position as needed
@@ -131,6 +149,11 @@ class SwitchGUI:
         self.refresh_mac_table()
         self.switch.clear_mac_table()
 
+    def update_timer(self):
+        timer_value = self.timer_entry.get()
+        print("Timer value changed to:", timer_value)
+        self.switch.set_timer_value(int(timer_value))
+
     def start_action(self):
         # interface1 = self.interface1_entry.get()
         # interface2 = self.interface2_entry.get()
@@ -147,7 +170,7 @@ class SwitchGUI:
         interface1 = self.interface1_entry.get()
         interface2 = self.interface2_entry.get()
 
-        interface1 = "Realtek USB GbE Family Controller #11"
+        interface1 = "Realtek USB GbE Family Controller #3"
         interface2 = "Realtek USB GbE Family Controller"
 
         # Potentionally cause of issue

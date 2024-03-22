@@ -12,6 +12,8 @@ class Switch:
 
         self.mac_addresses_to_ignore = ["14:4f:d7:c5:30:51", "00:e0:4c:42:6c:80", "f8:e9:4f:5b:91:89", "f8:e9:4f:76:f8:0a"]
 
+        self.timer_value = 15
+
         self.interfaces = {
 
         }
@@ -52,6 +54,8 @@ class Switch:
         # print("---------------------------------------------------------------------------------------")
         # print("Handle packet method")
 
+        print("Value of self.timer is ", self.timer_value)
+
         is_looping = False
 
         packet_hash = self.get_packet_hash(packet)
@@ -89,7 +93,7 @@ class Switch:
                     return None
 
                 # Add later logic for ignoring packets from switch itself
-                self.mac_address_table.add_entry(src_mac, 15, interface_name)
+                self.mac_address_table.add_entry(src_mac, self.timer_value, interface_name)
 
             else:
                 return None
@@ -326,7 +330,10 @@ class Switch:
         self.interfaces["Ethernet 1"] = interface2
 
     def return_mac_table(self):
+        #self.mac_address_table.remove_expired_entries(self.timer_value)
         return self.mac_address_table.get_table()
+
+
 
     def decrement_mac_table_timer(self):
         while True:
@@ -343,6 +350,9 @@ class Switch:
 
     def clear_mac_table(self):
         self.mac_address_table.clear_table()
+
+    def set_timer_value(self, timer_value):
+        self.timer_value = timer_value
 
 
 if __name__ == "__main__":
