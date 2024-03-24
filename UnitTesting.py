@@ -1,3 +1,4 @@
+
 class MacAddressTable:
 
     def __init__(self):
@@ -12,18 +13,6 @@ class MacAddressTable:
     # Return mac address table
     def get_table(self):
         return self.table
-
-    # Method that removes all entries that has current time greater than given time in argumnet
-    # def remove_expired_entries(self, current_timer):
-    #     for mac_address, entry in self.table.items():
-    #         if entry["timer"] > current_timer:
-    #             del self.table[mac_address]
-
-    def remove_expired_entries(self, current_time):
-        mac_addresses = list(self.table.keys())  # Create a copy of the keys
-        for mac_address in mac_addresses:
-            if self.table[mac_address]['timer'] > current_time:
-                del self.table[mac_address]
 
     def show_table(self):
         print("MAC Address Table:\n")
@@ -45,13 +34,21 @@ class MacAddressTable:
         else:
             return None
 
-    # Clear the mac address table
-    def clear_table(self):
-        self.table.clear()
 
-    # Delete all entries for given interface
-    def delete_entries_for_interface(self, interface):
-        mac_addresses = list(self.table.keys())  # Create a copy of the keys
-        for mac_address in mac_addresses:
-            if self.table[mac_address]['interface'] == interface:
-                del self.table[mac_address]
+    def decrement_mac_table_timer(mac_address_table):
+        for mac_address, entry in mac_address_table.get_table().items():
+            entry["timer"] = int(entry["timer"]) - 1
+
+
+mac_table = MacAddressTable()
+
+mac_table.add_entry("00:0a:95:9d:68:16", "300", "1")
+mac_table.add_entry("00:0a:95:9d:68:17", "300", "2")
+mac_table.add_entry("00:0a:95:9d:68:18", "300", "3")
+
+for i in range(5):
+    mac_table.decrement_mac_table_timer()
+
+
+mac_table.show_table()
+

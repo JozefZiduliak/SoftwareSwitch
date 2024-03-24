@@ -63,6 +63,10 @@ class SwitchGUI:
         tk.Button(self.root, text="Refresh Interface list", font=('Arial', 10), command=self.start_action).place(x=585, y=50)
         tk.Button(self.root, text="Clear", font=('Arial', 10), command=self.clear_mac_table).place(x=350, y=350)
         tk.Button(self.root, text="UPDATE", font=('Arial', 10), command=self.update_timer).place(x=885, y=350)  # Adjust the positio
+        tk.Button(self.root, text="Reset Stats 1", font=('Arial', 10),
+                  command=self.reset_stats_interface_1).place(x=100, y=400)
+        tk.Button(self.root, text="Reset Stats 2", font=('Arial', 10),
+                  command=self.reset_stats_interface_2).place(x=1090, y=400)
 
 
     # Input fields and text above them
@@ -170,7 +174,7 @@ class SwitchGUI:
         interface1 = self.interface1_entry.get()
         interface2 = self.interface2_entry.get()
 
-        interface1 = "Realtek USB GbE Family Controller #3"
+        interface1 = "Realtek USB GbE Family Controller #2"
         interface2 = "Realtek USB GbE Family Controller"
 
         # Potentionally cause of issue
@@ -220,6 +224,7 @@ class SwitchGUI:
 
             # Remove old entries from the mac address table
 
+
             self.refresh_mac_table()
             mac_address_table = self.switch.return_mac_table()
 
@@ -227,6 +232,11 @@ class SwitchGUI:
                 self.add_record_to_mac_table(mac_address, entry['timer'], entry['interface'])
 
 
+    def reset_stats_interface_1(self):
+        self.switch.clear_stats("interface1")
+
+    def reset_stats_interface_2(self):
+        self.switch.clear_stats("interface2")
 
 # if __name__ == "__main__":
 #     app = SwitchGUI()

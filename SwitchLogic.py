@@ -10,7 +10,7 @@ class Switch:
     #def __init__(self, switch_gui: SwitchGUI):
     def __init__(self):
 
-        self.mac_addresses_to_ignore = ["14:4f:d7:c5:30:51", "00:e0:4c:42:6c:80", "f8:e9:4f:5b:91:89", "f8:e9:4f:76:f8:0a"]
+        self.mac_addresses_to_ignore = ["14:4f:d7:c5:30:51", "00:e0:4c:40:70:b1", "f8:e9:4f:5b:91:84", "f8:e9:4f:76:f8:16"]
 
         self.timer_value = 15
 
@@ -19,6 +19,7 @@ class Switch:
         }
 
         self.stats_lock = threading.Lock()
+        self.mac_address_table_lock = threading.Lock()
 
         self.last_handled_packet_hashes = deque(maxlen=20)
 
@@ -33,8 +34,10 @@ class Switch:
                 }
             }
 
-        # self.switch_table = {
-        #
+        # Stores time of the last packet on each interface
+        # self.last_packet_time = {
+        #     "interface1": 0,
+        #     "interface2": 0
         # }
 
         #Mac adresses of my interfaces
@@ -54,7 +57,8 @@ class Switch:
         # print("---------------------------------------------------------------------------------------")
         # print("Handle packet method")
 
-        print("Value of self.timer is ", self.timer_value)
+        #print("Value of self.timer is ", self.timer_value)
+
 
         is_looping = False
 
@@ -89,14 +93,20 @@ class Switch:
                 src_mac = packet['Ether'].src
                 dst_mac = packet['Ether'].dst
 
+                # Update time of the last packet on the interface
+                #self.last_packet_time[interface_name] = time.time()
+
                 if src_mac in self.mac_addresses_to_ignore:
                     return None
 
                 # Add later logic for ignoring packets from switch itself
-                self.mac_address_table.add_entry(src_mac, self.timer_value, interface_name)
+                with self.mac_address_table_lock:
+                    self.mac_address_table.add_entry(src_mac, self.timer_value, interface_name)
 
             else:
                 return None
+
+            print(f"Updated timer for interface {interface_name}")
 
 
             protocol_map = {
@@ -139,23 +149,25 @@ class Switch:
 
 
             else:
+                with self.mac_address_table_lock:
                 # Check if the destination MAC address is in the MAC address table
-                if packet[Ether].dst in self.mac_address_table.get_table():
 
-                    # Get the interface associated with the destination MAC address
-                    destination_interface = self.mac_address_table.get_interface(packet[Ether].dst)
+                    if packet[Ether].dst in self.mac_address_table.get_table():
 
-                    if destination_interface != interface_name:
-                        # Forward the packet out of the interface associated with the destination MAC address
-                        self.forward_packet(packet, destination_interface)
+                        # Get the interface associated with the destination MAC address
+                        destination_interface = self.mac_address_table.get_interface(packet[Ether].dst)
 
-                else:
-                    # If the destination MAC address is not in the MAC address table, broadcast the packet
-                    # Loop through the interfaces
-                    for interface in self.interfaces:
-                        # If the current interface is not the one the packet came from, forward the packet
-                        if interface != interface_name:
-                            self.forward_packet(packet, interface)
+                        if destination_interface != interface_name:
+                            # Forward the packet out of the interface associated with the destination MAC address
+                            self.forward_packet(packet, destination_interface)
+
+                    else:
+                        # If the destination MAC address is not in the MAC address table, broadcast the packet
+                        # Loop through the interfaces
+                        for interface in self.interfaces:
+                            # If the current interface is not the one the packet came from, forward the packet
+                            if interface != interface_name:
+                                self.forward_packet(packet, interface)
 
             self.packet_number += 1
 
@@ -329,30 +341,77 @@ class Switch:
         self.interfaces["Ethernet 0"] = interface1
         self.interfaces["Ethernet 1"] = interface2
 
+    # def return_mac_table(self):
+    #     with self.mac_address_table_lock:
+    #         self.mac_address_table.remove_expired_entries(self.timer_value)
+    #
+    #         # Check if the last packet was received more than 10 seconds ago
+    #         for interface in self.interfaces:
+    #             print(interface)
+    #             if time.time() - self.last_packet_time[interface] > 10:
+    #                 self.mac_address_table.delete_entries_for_interface(interface)
+    #
+    #         return self.mac_address_table.get_table()
+
     def return_mac_table(self):
-        #self.mac_address_table.remove_expired_entries(self.timer_value)
-        return self.mac_address_table.get_table()
+        with self.mac_address_table_lock:
+            self.mac_address_table.remove_expired_entries(self.timer_value)
+
+            # Check if the last packet was received more than 10 seconds ago
+            # for interface in self.interfaces:
+            #     # Ensure the interface is in the last_packet_time dictionary
+            #     if interface not in self.last_packet_time:
+            #         self.last_packet_time[interface] = 0
+            #
+            #     if time.time() - self.last_packet_time[interface] > 10:
+            #         self.mac_address_table.delete_entries_for_interface(interface)
+
+            return self.mac_address_table.get_table()
 
 
+    # Original decrement mac table timer function
+    # def decrement_mac_table_timer(self):
+    #     while True:
+    #         # Create a copy of the keys
+    #         mac_addresses = list(self.mac_address_table.get_table().keys())
+    #         for mac_address in mac_addresses:
+    #             entry = self.mac_address_table.get_table().get(mac_address)
+    #             # Check if the entry still exists
+    #             if entry is not None:
+    #                 entry["timer"] = int(entry["timer"]) - 1
+    #                 if entry["timer"] == 0:
+    #                     self.mac_address_table.remove_entry(mac_address)
+    #         time.sleep(1)
 
+    # Function that locks the mac address table and decrements the timer for each entry
     def decrement_mac_table_timer(self):
         while True:
             # Create a copy of the keys
             mac_addresses = list(self.mac_address_table.get_table().keys())
             for mac_address in mac_addresses:
-                entry = self.mac_address_table.get_table().get(mac_address)
-                # Check if the entry still exists
-                if entry is not None:
-                    entry["timer"] = int(entry["timer"]) - 1
-                    if entry["timer"] == 0:
-                        self.mac_address_table.remove_entry(mac_address)
+                with self.mac_address_table_lock:
+                    entry = self.mac_address_table.get_table().get(mac_address)
+                    # Check if the entry still exists
+                    if entry is not None:
+                        entry["timer"] = int(entry["timer"]) - 1
+                        if entry["timer"] == 0:
+                            self.mac_address_table.remove_entry(mac_address)
             time.sleep(1)
 
+
     def clear_mac_table(self):
-        self.mac_address_table.clear_table()
+        with self.mac_address_table_lock:
+            self.mac_address_table.clear_table()
 
     def set_timer_value(self, timer_value):
         self.timer_value = timer_value
+
+    def clear_stats(self, interface_name):
+        if interface_name in self.interfaces_stats:
+            self.interfaces_stats[interface_name]["Incoming"] = self.generate_stats_dict()
+            self.interfaces_stats[interface_name]["Outgoing"] = self.generate_stats_dict()
+        else:
+            print("Invalid interface name.")
 
 
 if __name__ == "__main__":
