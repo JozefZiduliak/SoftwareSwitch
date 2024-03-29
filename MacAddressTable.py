@@ -13,11 +13,6 @@ class MacAddressTable:
     def get_table(self):
         return self.table
 
-    # Method that removes all entries that has current time greater than given time in argumnet
-    # def remove_expired_entries(self, current_timer):
-    #     for mac_address, entry in self.table.items():
-    #         if entry["timer"] > current_timer:
-    #             del self.table[mac_address]
 
     def remove_expired_entries(self, current_time):
         mac_addresses = list(self.table.keys())  # Create a copy of the keys

@@ -3,12 +3,16 @@ from scapy.all import *
 from scapy.layers.l2 import Ether, ARP
 from scapy.layers.inet import IP, TCP, UDP, ICMP
 from MacAddressTable import MacAddressTable
+from SwitchACL import AccesControlList
 import time
+
+#! TODO check locks and test the code
+#!TODO Clear spaghety code related to interface names
 
 class Switch:
 
-    #def __init__(self, switch_gui: SwitchGUI):
-    def __init__(self):
+    # def __init__(self, switch_gui: SwitchGUI):
+    def __init__(self, acl):
 
         self.mac_addresses_to_ignore = ["14:4f:d7:c5:30:51", "00:e0:4c:40:70:b1", "f8:e9:4f:5b:91:84", "f8:e9:4f:76:f8:16"]
 
@@ -40,7 +44,7 @@ class Switch:
         #     "interface2": 0
         # }
 
-        #Mac adresses of my interfaces
+        # Mac adresses of my interfaces
         self.switch_ports_mac_address = {
             "eth0": "00:0c:29:0d:3e:3c",
             "eth1": "00:0c:29:0d:3e:46"
@@ -49,28 +53,40 @@ class Switch:
         # Mac address table
         self.mac_address_table = MacAddressTable()
 
+
+
+        # Access control list
+        #self.acl = AccesControlList()
+        self.acl = acl
+
+        # Allow ICMP traffic in all directio and arp as well
+
+        #self.acl.add_rule("Ethernet 0", "out", "allow", "any", "any", "any", "any", "any", "any", "any")
+        #self.acl.add_rule("Ethernet 0", "in", "allow", "any", "any", "any", "any", "any", "any", "any")
+
+        #self.acl.add_rule("Ethernet 1", "out", "allow", "any", "any", "any", "any", "any", "any", "any")
+        #self.acl.add_rule("Ethernet 1", "in", "allow", "any", "any", "any", "any", "any", "any", "any")
+
+
+        self.acl.print_rules()
+
         self.stop_threads = False
 
         self.packet_number = 0
+
     def handle_packet(self, packet, interface_name):
 
-        # print("---------------------------------------------------------------------------------------")
-        # print("Handle packet method")
-
-        #print("Value of self.timer is ", self.timer_value)
-
+        # Check if the packet is allowed by the ACL
+        if not self.acl.check_if_allowed(interface_name, "in", packet):
+            # If the packet is not allowed, return immediately
+            return
 
         is_looping = False
 
         packet_hash = self.get_packet_hash(packet)
 
-        # print(f"Current interface name: {interface_name}")
-
         # Zisti správny kľúč pre aktuálne rozhranie
         current_interface_key = "interface1" if interface_name == "Ethernet 0" else "interface2"
-
-        # print(f"Current interface key: {current_interface_key}")
-
 
         # Check if the deque contains old entries and clear them
         self.check_and_clear_deque()
@@ -84,17 +100,15 @@ class Switch:
             # Add the packet to the deque
             self.add_packet(packet_hash)
 
-
         # New logic of handling duplicate traffic in network
         if not is_looping:
-
 
             if Ether in packet:
                 src_mac = packet['Ether'].src
                 dst_mac = packet['Ether'].dst
 
                 # Update time of the last packet on the interface
-                #self.last_packet_time[interface_name] = time.time()
+                # self.last_packet_time[interface_name] = time.time()
 
                 if src_mac in self.mac_addresses_to_ignore:
                     return None
@@ -106,8 +120,7 @@ class Switch:
             else:
                 return None
 
-            print(f"Updated timer for interface {interface_name}")
-
+            #print(f"Updated timer for interface {interface_name}")
 
             protocol_map = {
                 Ether: "Ethernet",
@@ -136,21 +149,24 @@ class Switch:
                 # Increment the total incoming traffic count
                 self.interfaces_stats[current_interface_key]["Incoming"]["Total"] += 1
 
-
             # Is it broadcast?
             if packet[Ether].dst == "ff:ff:ff:ff:ff:ff":
 
-                #Send it out of the other interface
+                # Send it out of the other interface
                 # Loop through the interfaces
                 for interface in self.interfaces:
                     # If the current interface is not the one the packet came from, forward the packet
                     if interface != interface_name:
-                        self.forward_packet(packet, interface)
+                        # WITHOUT ACL ========================
+                        # self.forward_packet(packet, interface)
 
+                        # ACL check
+                        if self.acl.check_if_allowed(interface_name, "out", packet):
+                            self.forward_packet(packet, interface)
 
             else:
                 with self.mac_address_table_lock:
-                # Check if the destination MAC address is in the MAC address table
+                    # Check if the destination MAC address is in the MAC address table
 
                     if packet[Ether].dst in self.mac_address_table.get_table():
 
@@ -159,7 +175,14 @@ class Switch:
 
                         if destination_interface != interface_name:
                             # Forward the packet out of the interface associated with the destination MAC address
-                            self.forward_packet(packet, destination_interface)
+
+                            # WITHOUT ACL ========================
+                            # print(f"Interface name: {interface_name}")
+                            # self.forward_packet(packet, destination_interface)
+
+                            #ACL check
+                            if self.acl.check_if_allowed(interface_name, "out", packet):
+                                self.forward_packet(packet, destination_interface)
 
                     else:
                         # If the destination MAC address is not in the MAC address table, broadcast the packet
@@ -167,11 +190,15 @@ class Switch:
                         for interface in self.interfaces:
                             # If the current interface is not the one the packet came from, forward the packet
                             if interface != interface_name:
-                                self.forward_packet(packet, interface)
+
+                                #WITHOUT ACL ========================
+                                # print(f"Interface name: {interface_name}")
+                                # self.forward_packet(packet, interface)
+
+                                if self.acl.check_if_allowed(interface_name, "out", packet):
+                                    self.forward_packet(packet, interface)
 
             self.packet_number += 1
-
-
 
     def start_listening(self, interface_name):
         # Úprava: Kontrola `stop_threads` pred a počas príjmu paketov
@@ -181,7 +208,6 @@ class Switch:
             self.handle_packet(packet, interface_name)
 
         sniff(iface=self.interfaces[interface_name], prn=custom_packet_handler, stop_filter=lambda x: self.stop_threads)
-
 
     def show_interface_stats(self):
         # Header for the stats display
@@ -196,18 +222,18 @@ class Switch:
                 print(f"\n  {direction.capitalize()} Traffic:")
                 # Iterating through each traffic type and printing its count
                 for traffic_type, count in stats.items():
-                    #Printing each traffic type's count in a readable format
+                    # Printing each traffic type's count in a readable format
                     print(f"    {traffic_type}: {count}")
                     print("")  # Adding a newline for better readability between sections
 
             # Separating interfaces for clarity
             print("======================================\n")
 
-
     def forward_packet(self, packet, destination_interface):
 
-
-        #print("This is a forwar packet method")
+        print("======================================\n")
+        print("This is a forwar packet method")
+        print("======================================\n")
 
         if destination_interface in self.interfaces:
             # Send the packet out of the specified interface
@@ -232,9 +258,9 @@ class Switch:
                     if protocol in packet:
                         self.interfaces_stats[current_interface_key]["Outgoing"][key] += 1
 
-                #if ICMP in packet:
-                    #print("This is an ICMP packet that will be forwarded")
-                    #print("Sequence number of ICMP packet:", packet[ICMP].seq)
+                # if ICMP in packet:
+                    # print("This is an ICMP packet that will be forwarded")
+                    # print("Sequence number of ICMP packet:", packet[ICMP].seq)
 
                 # Check for HTTP and HTTPS separately as they are identified by destination port
                 if TCP in packet:
@@ -264,10 +290,10 @@ class Switch:
 
             # Convert the stats dictionary to a list and return it
             # Print the number of elements in the list
-            #print(f"Number of elements in the list: {len(list(stats_dict.values()))}")
+            # print(f"Number of elements in the list: {len(list(stats_dict.values()))}")
             return list(stats_dict.values())
         else:
-           # print("Invalid interface name or direction.")
+            # print("Invalid interface name or direction.")
             return []
 
     def generate_stats_dict(self):
@@ -283,30 +309,16 @@ class Switch:
             "Total": 0,
         }
 
-    import hashlib
-
     def get_packet_hash(self, packet):
         packet_bytes = raw(packet)
         sha256_hash = hashlib.sha256(packet_bytes).hexdigest()
         return sha256_hash
 
-    #Function to add a packet to the deque
-    # def add_packet(self, packet_hash):
-    #     #self.last_handled_packets_hashes.append(packet)
-    #     self.last_handled_packet_hashes.append(packet_hash)
 
     def add_packet(self, packet_hash):
         # Add the packet hash and the current time to the deque
         self.last_handled_packet_hashes.append((packet_hash, time.time()))
 
-    # def is_packet_in_deque(self, packet_hash):
-    #     # Iterate over the deque
-    #     for p in self.last_handled_packet_hashes:
-    #         # If the hash of the current packet matches the given hash, return True
-    #         if p == packet_hash:
-    #             return True
-    #     # If no match was found after iterating over the entire deque, return False
-    #     return False
 
     def is_packet_in_deque(self, packet_hash):
         # Iterate over the deque
@@ -316,16 +328,6 @@ class Switch:
                 return True
         # If no match was found after iterating over the entire deque, return False
         return False
-
-    # def check_and_clear_deque(self):
-    #     # If the deque is not empty
-    #     if self.last_handled_packet_hashes:
-    #         # Get the time the newest packet was added
-    #         _, newest_time = self.last_handled_packet_hashes[-1]
-    #         # If more than 5 seconds have passed since the newest packet was added
-    #         if time.time() - newest_time > 5:
-    #             # Clear the deque
-    #             self.last_handled_packet_hashes.clear()
 
     def check_and_clear_deque(self):
         # If the deque is not empty
@@ -337,21 +339,10 @@ class Switch:
                 # Clear the deque
                 self.last_handled_packet_hashes.clear()
 
+    # CHANGE
     def set_interface_name(self, interface1, interface2):
         self.interfaces["Ethernet 0"] = interface1
         self.interfaces["Ethernet 1"] = interface2
-
-    # def return_mac_table(self):
-    #     with self.mac_address_table_lock:
-    #         self.mac_address_table.remove_expired_entries(self.timer_value)
-    #
-    #         # Check if the last packet was received more than 10 seconds ago
-    #         for interface in self.interfaces:
-    #             print(interface)
-    #             if time.time() - self.last_packet_time[interface] > 10:
-    #                 self.mac_address_table.delete_entries_for_interface(interface)
-    #
-    #         return self.mac_address_table.get_table()
 
     def return_mac_table(self):
         with self.mac_address_table_lock:
@@ -367,21 +358,6 @@ class Switch:
             #         self.mac_address_table.delete_entries_for_interface(interface)
 
             return self.mac_address_table.get_table()
-
-
-    # Original decrement mac table timer function
-    # def decrement_mac_table_timer(self):
-    #     while True:
-    #         # Create a copy of the keys
-    #         mac_addresses = list(self.mac_address_table.get_table().keys())
-    #         for mac_address in mac_addresses:
-    #             entry = self.mac_address_table.get_table().get(mac_address)
-    #             # Check if the entry still exists
-    #             if entry is not None:
-    #                 entry["timer"] = int(entry["timer"]) - 1
-    #                 if entry["timer"] == 0:
-    #                     self.mac_address_table.remove_entry(mac_address)
-    #         time.sleep(1)
 
     # Function that locks the mac address table and decrements the timer for each entry
     def decrement_mac_table_timer(self):
@@ -412,6 +388,11 @@ class Switch:
             self.interfaces_stats[interface_name]["Outgoing"] = self.generate_stats_dict()
         else:
             print("Invalid interface name.")
+
+
+    # ZMENY
+    #Monitorovanie stavu portu
+
 
 
 if __name__ == "__main__":
