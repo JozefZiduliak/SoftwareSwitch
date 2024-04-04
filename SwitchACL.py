@@ -48,6 +48,17 @@ class AccesControlList:
             protocol = "TCP"
             src_port = packet[TCP].sport
             dst_port = packet[TCP].dport
+
+            # if dst_port == 8000:
+            #     print("-----------------")
+            #     print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            #     print("======================================\n")
+            #     # Print info about packet
+            #     print(f"Interface: {interface}, Direction: {direction}")
+            #     print(f"Source MAC: {src_mac}, Destination MAC: {dst_mac}")
+            #     print(f"Source IP: {src_ip}, Destination IP: {dst_ip}")
+            #     print(f"Protocol: {protocol}")
+            #     print(f"Source Port: {src_port}, Destination Port: {dst_port}")
         if UDP in packet:
             protocol = "UDP"
             src_port = packet[UDP].sport
@@ -55,13 +66,13 @@ class AccesControlList:
         if ICMP in packet:
             protocol = "ICMP"
 
-        print("======================================\n")
-        # Print info about packet
-        print(f"Interface: {interface}, Direction: {direction}")
-        print(f"Source MAC: {src_mac}, Destination MAC: {dst_mac}")
-        print(f"Source IP: {src_ip}, Destination IP: {dst_ip}")
-        print(f"Protocol: {protocol}")
-        print(f"Source Port: {src_port}, Destination Port: {dst_port}")
+        # print("======================================\n")
+        # # Print info about packet
+        # print(f"Interface: {interface}, Direction: {direction}")
+        # print(f"Source MAC: {src_mac}, Destination MAC: {dst_mac}")
+        # print(f"Source IP: {src_ip}, Destination IP: {dst_ip}")
+        # print(f"Protocol: {protocol}")
+        # print(f"Source Port: {src_port}, Destination Port: {dst_port}")
 
         number = 0
 
@@ -110,7 +121,7 @@ class AccesControlList:
                     print("Action is deny")
                     return False
 
-        return False
+        return True
 
     def get_rules(self):
         with self.acl_lock:

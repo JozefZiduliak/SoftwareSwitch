@@ -23,7 +23,7 @@ class Switch:
         }
 
         self.stats_lock = threading.Lock()
-        self.mac_address_table_lock = threading.Lock()
+        #self.mac_address_table_lock = threading.Lock()
 
         self.last_handled_packet_hashes = deque(maxlen=20)
 
@@ -76,10 +76,6 @@ class Switch:
 
     def handle_packet(self, packet, interface_name):
 
-        # Check if the packet is allowed by the ACL
-        if not self.acl.check_if_allowed(interface_name, "in", packet):
-            # If the packet is not allowed, return immediately
-            return
 
         is_looping = False
 
@@ -103,6 +99,11 @@ class Switch:
         # New logic of handling duplicate traffic in network
         if not is_looping:
 
+            # Check if the packet is allowed by the ACL
+            if not self.acl.check_if_allowed(interface_name, "in", packet):
+                # If the packet is not allowed, return immediately
+                return
+
             if Ether in packet:
                 src_mac = packet['Ether'].src
                 dst_mac = packet['Ether'].dst
@@ -114,8 +115,8 @@ class Switch:
                     return None
 
                 # Add later logic for ignoring packets from switch itself
-                with self.mac_address_table_lock:
-                    self.mac_address_table.add_entry(src_mac, self.timer_value, interface_name)
+                #with self.mac_address_table_lock:
+                self.mac_address_table.add_entry(src_mac, self.timer_value, interface_name)
 
             else:
                 return None
@@ -161,19 +162,19 @@ class Switch:
                         # self.forward_packet(packet, interface)
 
                         # ACL check
-                        if self.acl.check_if_allowed(interface_name, "out", packet):
+                        if self.acl.check_if_allowed(interface, "out", packet):
                             self.forward_packet(packet, interface)
 
             else:
-                with self.mac_address_table_lock:
+                #with self.mac_address_table_lock:
                     # Check if the destination MAC address is in the MAC address table
 
-                    if packet[Ether].dst in self.mac_address_table.get_table():
+                if packet[Ether].dst in self.mac_address_table.get_table():
 
                         # Get the interface associated with the destination MAC address
-                        destination_interface = self.mac_address_table.get_interface(packet[Ether].dst)
+                    destination_interface = self.mac_address_table.get_interface(packet[Ether].dst)
 
-                        if destination_interface != interface_name:
+                    if destination_interface != interface_name:
                             # Forward the packet out of the interface associated with the destination MAC address
 
                             # WITHOUT ACL ========================
@@ -181,22 +182,22 @@ class Switch:
                             # self.forward_packet(packet, destination_interface)
 
                             #ACL check
-                            if self.acl.check_if_allowed(interface_name, "out", packet):
-                                self.forward_packet(packet, destination_interface)
+                        if self.acl.check_if_allowed(destination_interface, "out", packet):
+                            self.forward_packet(packet, destination_interface)
 
-                    else:
+                else:
                         # If the destination MAC address is not in the MAC address table, broadcast the packet
                         # Loop through the interfaces
-                        for interface in self.interfaces:
+                    for interface in self.interfaces:
                             # If the current interface is not the one the packet came from, forward the packet
-                            if interface != interface_name:
+                        if interface != interface_name:
 
                                 #WITHOUT ACL ========================
                                 # print(f"Interface name: {interface_name}")
                                 # self.forward_packet(packet, interface)
 
-                                if self.acl.check_if_allowed(interface_name, "out", packet):
-                                    self.forward_packet(packet, interface)
+                            if self.acl.check_if_allowed(interface, "out", packet):
+                                self.forward_packet(packet, interface)
 
             self.packet_number += 1
 
@@ -234,6 +235,13 @@ class Switch:
         print("======================================\n")
         print("This is a forwar packet method")
         print("======================================\n")
+
+        # Print src and dst MAC address
+        print(f"Source MAC: {packet[Ether].src}, Destination MAC: {packet[Ether].dst}")
+
+        # Print src and dst IP address
+        print(f"Destination interface {destination_interface}")
+
 
         if destination_interface in self.interfaces:
             # Send the packet out of the specified interface
@@ -345,8 +353,8 @@ class Switch:
         self.interfaces["Ethernet 1"] = interface2
 
     def return_mac_table(self):
-        with self.mac_address_table_lock:
-            self.mac_address_table.remove_expired_entries(self.timer_value)
+        #with self.mac_address_table_lock:
+        self.mac_address_table.remove_expired_entries(self.timer_value)
 
             # Check if the last packet was received more than 10 seconds ago
             # for interface in self.interfaces:
@@ -357,7 +365,7 @@ class Switch:
             #     if time.time() - self.last_packet_time[interface] > 10:
             #         self.mac_address_table.delete_entries_for_interface(interface)
 
-            return self.mac_address_table.get_table()
+        return self.mac_address_table.get_table()
 
     # Function that locks the mac address table and decrements the timer for each entry
     def decrement_mac_table_timer(self):
@@ -365,19 +373,19 @@ class Switch:
             # Create a copy of the keys
             mac_addresses = list(self.mac_address_table.get_table().keys())
             for mac_address in mac_addresses:
-                with self.mac_address_table_lock:
-                    entry = self.mac_address_table.get_table().get(mac_address)
-                    # Check if the entry still exists
-                    if entry is not None:
-                        entry["timer"] = int(entry["timer"]) - 1
-                        if entry["timer"] == 0:
-                            self.mac_address_table.remove_entry(mac_address)
+                #with self.mac_address_table_lock:
+                entry = self.mac_address_table.get_table().get(mac_address)
+                # Check if the entry still exists
+                if entry is not None:
+                    entry["timer"] = int(entry["timer"]) - 1
+                    if entry["timer"] == 0:
+                        self.mac_address_table.remove_entry(mac_address)
             time.sleep(1)
 
 
     def clear_mac_table(self):
-        with self.mac_address_table_lock:
-            self.mac_address_table.clear_table()
+        #with self.mac_address_table_lock:
+        self.mac_address_table.clear_table()
 
     def set_timer_value(self, timer_value):
         self.timer_value = timer_value

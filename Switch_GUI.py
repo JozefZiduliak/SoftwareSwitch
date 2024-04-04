@@ -185,14 +185,19 @@ class SwitchGUI:
         source_port = self.source_port_entry.get()
         destination_port = self.destination_port_entry.get()
 
-        # self.acl.add_rule(interface, direction, action, protocol, source_mac, destination_mac, source_ip, destination_ip, source_port, destination_port)
+        if source_port != 'any':
+            source_port = int(source_port)
+        if destination_port != 'any':
+            destination_port = int(destination_port)
+
+        self.acl.add_rule(interface, direction, action, protocol, source_mac, destination_mac, source_ip, destination_ip, source_port, destination_port)
         # self.acl.add_rule("Ethernet 0", "out", "allow", "any", "any", "any", "any", "any", "any", "any")
 
-        self.acl.add_rule("Ethernet 0", "out", "allow", "any", "any", "any", "any", "any", "any", "any")
-        self.acl.add_rule("Ethernet 0", "in", "allow", "any", "any", "any", "any", "any", "any", "any")
+        #self.acl.add_rule("Ethernet 0", "out", "allow", "any", "any", "any", "any", "192.168.0.2", "any", "any")
+        #self.acl.add_rule("Ethernet 0", "in", "allow", "any", "any", "any", "any", "any", "any", "any")
 
-        self.acl.add_rule("Ethernet 1", "out", "allow", "any", "any", "any", "any", "any", "any", "any")
-        self.acl.add_rule("Ethernet 1", "in", "allow", "any", "any", "any", "any", "any", "any", "any")
+        #self.acl.add_rule("Ethernet 1", "out", "allow", "any", "any", "any", "any", "any", "any", "any")
+        #self.acl.add_rule("Ethernet 1", "in", "allow", "any", "any", "any", "any", "any", "any", "any")
 
     def delete_acl_rule(self):
         acl_id = self.acl_entry.get()
@@ -307,10 +312,15 @@ class SwitchGUI:
 
     def start_action(self):
 
+        #self.acl.add_rule("Ethernet 0", "out", "deny", "any", "any", "any", "any", "192.168.0.2", "any", "any")
+        #self.acl.add_rule("Ethernet 1", "in", "deny", "ICMP", "any", "7c:57:58:3e:d2:3d", "any", "any", "any", "any")
+
+        #self.acl.add_rule("Ethernet 0", "in", "deny", "any", "any", "any", "192.168.0.2", "any", "any", 8000)
+
         interface1 = self.interface1_entry.get()
         interface2 = self.interface2_entry.get()
 
-        interface1 = "Realtek USB GbE Family Controller #2"
+        interface1 = "Realtek USB GbE Family Controller #11"
         interface2 = "Realtek USB GbE Family Controller"
 
         # Potentionally cause of issue
@@ -361,11 +371,8 @@ class SwitchGUI:
             for i in range(9):
                 self.outgoing_traffic_interface2[i].set(interface2_outgoing_stats[i])
 
-            time.sleep(1)  # Pause for a while before the next update
-
             # Remove old entries from the mac address table
             self.refresh_mac_table()
-
 
             # ACL Logic
             self.refresh_acl_table()
