@@ -306,6 +306,7 @@ class SwitchGUI:
         self.switch.set_timer_value(int(timer_value))
 
     def add_entry_to_acl_table(self, rule):
+
         self.acl_table.insert('', 'end', values=(rule['interface'], rule['direction'], rule['action'], rule['protocol'],
                                                  rule['source_mac'], rule['destination_mac'], rule['source_ip'],
                                                  rule['destination_ip'], rule['source_port'], rule['destination_port']))

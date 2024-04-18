@@ -37,10 +37,20 @@ class AccesControlList:
             src_mac = packet[Ether].src
             dst_mac = packet[Ether].dst
         if ARP in packet:
+
+
+            protocol = "ARP"  # Set protocol to ARP if ARP is in the packet
             src_mac = packet[ARP].hwsrc
             dst_mac = packet[ARP].hwdst
             src_ip = packet[ARP].psrc
             dst_ip = packet[ARP].pdst
+
+            # Print src and dst mac and ip
+            print(f"Source MAC: {src_mac}, Destination MAC: {dst_mac}")
+            print(f"Source IP: {src_ip}, Destination IP: {dst_ip}")
+
+
+
         if IP in packet:
             src_ip = packet[IP].src
             dst_ip = packet[IP].dst
@@ -78,6 +88,8 @@ class AccesControlList:
 
         print("Checking rules")
 
+        print(f"Protocol: {protocol}")
+
         with self.acl_lock:
             for rule in self.rules:
                 print()
@@ -94,14 +106,19 @@ class AccesControlList:
                 if rule["source_mac"] != src_mac and rule["source_mac"] != "any":
                     continue
 
+
                 if rule["destination_mac"] != dst_mac and rule["destination_mac"] != "any":
                     continue
+
 
                 if rule["source_ip"] != src_ip and rule["source_ip"] != "any":
                     continue
 
+
                 if rule["destination_ip"] != dst_ip and rule["destination_ip"] != "any":
                     continue
+
+
 
                 if rule["protocol"] != protocol and rule["protocol"] != "any":
                     continue
